@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Taller de analogías · Ejercicios de Control de Procesos</title>
+<meta name="description" content="Juego interactivo de analogías fuerza-voltaje para Control de Procesos: simplifica el circuito, cuenta las mallas, traduce cada elemento a su análogo mecánico o eléctrico y escribe las ecuaciones.">
+<meta name="author" content="Jheison Estiben Bernal Cucaita">
+<link rel="canonical" href="https://jheisonbernal9922-code.github.io/taller-de-analogias/">
+<meta property="og:title" content="Taller de analogías">
+<meta property="og:description" content="Juego interactivo de analogías fuerza-voltaje para Control de Procesos: simplifica el circuito, cuenta las mallas, traduce cada elemento a su análogo mecánico o eléctrico y escribe las ecuaciones.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_CO">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: igual que el reductor de bloques. Izquierda = equivalencias y fórmulas; derecha = tablero por fases
+   (simplificar → contar mallas → traducir arrastrando → ecuaciones). */
+:root{
+  --bg:#eef2f6; --paper:#fbfcfd; --grid:#dfe7f0; --ink:#17202b; --muted:#5d6b7a; --line:#c9d3de;
+  --accent:#1f5fbf; --sel:#e8a317; --ok:#1d9b5a; --bad:#d6402e; --block:#ffffff; --hl:#d9480f; --mec:#7a3fb0;
+  --display:"Chakra Petch","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1520; --paper:#111c2a; --grid:#1a2838; --ink:#e4ecf5; --muted:#8fa1b5; --line:#2a3b4f;
+  --accent:#6aa6ff; --sel:#f2b53a; --ok:#3ccf86; --bad:#ff6b57; --block:#16263a; --hl:#ff9a4d; --mec:#c79bff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1520; --paper:#111c2a; --grid:#1a2838; --ink:#e4ecf5; --muted:#8fa1b5; --line:#2a3b4f;
+  --accent:#6aa6ff; --sel:#f2b53a; --ok:#3ccf86; --bad:#ff6b57; --block:#16263a; --hl:#ff9a4d; --mec:#c79bff; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+body.dragging,body.dragging *{user-select:none!important;-webkit-user-select:none!important;cursor:grabbing}
+.wrap{max-width:1320px;margin:0 auto;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;justify-content:space-between}
+h1{font:700 clamp(26px,4vw,40px)/1 var(--display);margin:0;text-transform:uppercase}
+h1 span{color:var(--mec)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:72ch}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{font:600 14px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;padding:10px 14px;border:2px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+.tab[aria-selected="true"]{border-color:var(--accent);background:var(--accent);color:#fff}
+.lvb{font:600 13px/1 var(--display);padding:9px 11px;border:2px dashed var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+.lvb[aria-pressed="true"]{border-style:solid;border-color:var(--ok);background:var(--ok);color:#fff}
+.game{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.game{grid-template-columns:1fr}}
+.side{background:var(--paper);border:1px solid var(--line);display:grid;gap:0}
+.side h2{font:700 14px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;margin:0;padding:13px 14px 10px;border-bottom:1px solid var(--line)}
+.eq{width:100%;border-collapse:collapse;font:500 14px/1.3 var(--mono)}
+.eq td{padding:6px 14px;border-bottom:1px solid var(--line)}
+.eq td:first-child{color:var(--mec)} .eq td:last-child{color:var(--accent);text-align:right}
+.fl{display:grid;gap:6px;padding:8px}
+.f{display:grid;gap:4px;text-align:left;padding:9px 10px;border:2px solid transparent;background:transparent;color:var(--ink);cursor:pointer;font:inherit}
+.f:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.f[aria-pressed="true"]{border-color:var(--sel);background:color-mix(in srgb,var(--sel) 14%,transparent)}
+.f b{font-size:14px} .f code{font:500 13px/1.35 var(--mono);color:var(--muted)}
+.f svg{width:100%;height:auto}
+.gold{margin:8px;padding:10px 12px;border-left:4px solid var(--mec);background:color-mix(in srgb,var(--mec) 8%,transparent);font-size:13.5px}
+.gold b{color:var(--mec)}
+.warnbox{margin:0 8px 8px;padding:8px 10px;border:1px dashed var(--bad);font-size:13px;color:var(--ink)}
+.side.shake{animation:shake .4s}
+.board{background:var(--paper);border:1px solid var(--line);display:grid;min-width:0}
+.phases{display:flex;flex-wrap:wrap;gap:6px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.ph{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;padding:7px 10px;border:1px solid var(--line);color:var(--muted)}
+.ph.on{border-color:var(--accent);color:var(--accent)} .ph.done{border-color:var(--ok);color:var(--ok)}
+.stage{position:relative;background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;overflow:hidden}
+.stage svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;color:var(--ink)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.stage.shake{animation:shake .45s}
+.stage.flash::after{content:"";position:absolute;inset:0;background:var(--bad);opacity:.18;pointer-events:none;animation:fade .5s forwards}
+@keyframes fade{to{opacity:0}}
+@keyframes shake{20%{transform:translate(-7px,3px)}40%{transform:translate(6px,-4px)}60%{transform:translate(-4px,2px)}80%{transform:translate(3px,-1px)}}
+svg text{font-family:var(--mono);fill:var(--ink)}
+.w{fill:none;stroke:var(--ink);stroke-width:2}
+.el{cursor:pointer}
+.el .hit{fill:transparent}
+.el.pick .hit{fill:color-mix(in srgb,var(--sel) 22%,transparent);stroke:var(--sel);stroke-width:2.5}
+.el.bad .hit{fill:color-mix(in srgb,var(--bad) 22%,transparent)}
+.el.nuevo{animation:pop .6s cubic-bezier(.2,.9,.3,1.4)}
+.el.nuevo .sym{stroke:var(--ok)}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+.el{transform-box:fill-box;transform-origin:center}
+.sym{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round}
+.mec .sym{stroke:var(--mec)}
+.lasso{fill:color-mix(in srgb,var(--sel) 16%,transparent);stroke:var(--sel);stroke-width:2.5;stroke-dasharray:7 5}
+.slot rect.box{fill:color-mix(in srgb,var(--accent) 6%,transparent);stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5}
+.slot.over rect.box{fill:color-mix(in srgb,var(--sel) 25%,transparent);stroke:var(--sel)}
+.slot.full rect.box{display:none}
+.slot .q{font:600 16px var(--mono);fill:var(--accent)}
+.slot.nuevo{animation:pop .6s cubic-bezier(.2,.9,.3,1.4)}
+.tray{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--line);min-height:62px;align-items:center}
+.tray .lbl{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.chip{font:600 16px/1 var(--mono);padding:10px 14px;border:2px solid var(--ink);background:var(--block);color:var(--ink);cursor:grab;touch-action:none;user-select:none}
+.chip.e{border-color:var(--accent);color:var(--accent)} .chip.m{border-color:var(--mec);color:var(--mec)}
+.chip.sel{outline:3px solid var(--sel);outline-offset:2px}
+.chip.used{display:none}
+.ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%) scale(1.1);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.msg{padding:14px 16px;border-top:1px solid var(--line);min-height:84px;display:grid;gap:6px}
+.msg .t{font:700 16px/1.2 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.msg.ok .t{color:var(--ok)} .msg.bad .t{color:var(--bad)} .msg.warn .t{color:var(--sel)}
+.msg p{margin:0;max-width:85ch}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 13px/1 var(--body);padding:9px 12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)} .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.big{font:700 18px/1 var(--display);padding:12px 22px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 14px;align-items:center}
+.how{font-size:13.5px;color:var(--muted)} .how b{color:var(--ink)}
+.eqs{background:var(--paper);border:1px solid var(--line);padding:16px 18px;display:grid;gap:14px}
+.eqs h3{font:700 18px/1.1 var(--display);text-transform:uppercase;margin:0;color:var(--ok)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media (max-width:800px){.cols{grid-template-columns:1fr}}
+.col h4{font:700 14px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+.col.e h4{color:var(--accent)} .col.m h4{color:var(--mec)}
+.line{font:500 15px/1.6 var(--mono);padding:8px 10px;border:1px solid var(--line);margin-bottom:6px;overflow-x:auto;white-space:nowrap}
+.line.hid{opacity:0;transform:translateY(8px)} .line{transition:opacity .4s,transform .4s}
+.map{font:500 14px/1.6 var(--mono);padding:10px;border:1px dashed var(--line)}
+.steps{margin:0;padding-left:22px;display:grid;gap:4px}
+.tab2 td:last-child{text-align:left;color:var(--ink);font-family:var(--body);font-size:13.5px}
+.tab2 td:first-child{color:var(--mec);white-space:nowrap}
+#eblines{display:grid;gap:10px;align-content:start}
+.eline{border:2px solid var(--line);padding:10px 12px;cursor:pointer;background:var(--paper)}
+.eline.act{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.eline.ok{border-color:var(--ok);cursor:default;background:color-mix(in srgb,var(--ok) 8%,var(--paper))}
+.eline .who{font:700 13px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.eline.ok .who{color:var(--ok)}
+.eline .expr{font:500 19px/1.7 var(--mono);margin-top:6px;overflow-x:auto;white-space:nowrap}
+.eline .term{padding:1px 4px;border-bottom:2px solid var(--mec)}
+.eline .plus{color:var(--muted)} .eline .ph2{color:var(--muted);font-size:14px}
+.eline.shake2{animation:shake .45s;border-color:var(--bad)}
+.builder{display:grid;gap:10px;padding:12px;border:1px solid var(--line);background:color-mix(in srgb,var(--accent) 4%,var(--paper));position:sticky;bottom:0}
+.builder .lbl{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px}
+.builder .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tk{font:500 17px/1 var(--mono);padding:9px 12px;border:2px solid var(--line);background:var(--block);color:var(--ink);cursor:pointer;min-width:44px}
+.tk.c{border-color:var(--mec);color:var(--mec)} .tk.c.on{background:var(--mec);color:#fff}
+.tk.v{border-color:var(--accent);color:var(--accent)} .tk.r{border-color:var(--ok);color:var(--ok)}
+.tk:hover{filter:brightness(1.1)}
+.mine{display:grid;gap:10px;padding-bottom:12px;border-bottom:1px dashed var(--line)}
+.note{color:var(--muted)}
+button:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Taller de <span>analogías</span></h1>
+      <p class="sub">Actividad extra · Control de Procesos. Analogía fuerza-voltaje, el método de clase. Simplifica, cuenta las mallas y arrastra cada elemento a su análogo. Si te equivocas, explota.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-p="4">Ejercicio 4 · eléctrico → mecánico</button>
+      <button class="tab" role="tab" aria-selected="false" data-p="3">Ejercicio 3 · mecánico → eléctrico</button>
+      <button class="tab" role="tab" aria-selected="false" data-p="R">⟳ Aleatorio</button>
+      <span id="nivR" hidden role="group" aria-label="Nivel" style="display:inline-flex;gap:4px;flex-wrap:wrap">
+        <button class="lvb" data-lv="1" aria-pressed="false">Fácil</button><button class="lvb" data-lv="2" aria-pressed="false">Medio</button><button class="lvb" data-lv="3" aria-pressed="false">Difícil</button><button class="lvb" data-lv="4" aria-pressed="false">3 mallas (tipo Ej. 3)</button>
+      </span>
+      <button class="btn big" id="nuevoR" hidden style="background:var(--sel);border-color:var(--sel);color:#1b1606">⟳ Nuevo ejercicio</button>
+    </div>
+  </header>
+  <div class="game">
+    <aside class="side" id="side">
+      <h2>Equivalencias fuerza-voltaje</h2>
+      <table class="eq"><tr><td>F fuerza</td><td>V voltaje</td></tr><tr><td>m masa</td><td>L inductor</td></tr>
+        <tr><td>b amortiguador</td><td>R resistencia</td></tr><tr><td>K resorte</td><td>1/C capacitor</td></tr>
+        <tr><td>x desplazamiento</td><td>q carga</td></tr><tr><td>ẋ velocidad</td><td>q̇ = i corriente</td></tr></table>
+      <div class="gold"><b>Regla de las mallas:</b> cada malla es una masa (o un punto que se mueve). Un elemento que está <b>solo en una malla</b> va de esa masa a la pared. Un elemento en la <b>rama compartida</b> va entre las dos masas.</div>
+      <h2>Fórmulas para simplificar</h2>
+      <div class="fl" id="fl"></div>
+      <div class="warnbox"><b>Ojo:</b> los capacitores se combinan al revés que las resistencias. En serie se suman los inversos; en paralelo se suman directo.</div>
+    </aside>
+    <section class="board">
+      <div class="phases" id="phases"></div>
+      <div class="stage" id="stagebox"><svg id="svg" viewBox="0 0 1000 420" aria-label="Tablero"></svg><canvas id="fx"></canvas></div>
+      <div class="tray" id="tray" hidden></div>
+      <div class="msg" id="msg"><span class="t">Empieza</span><p id="why"></p><div class="opts" id="opts"></div></div>
+      <div class="tools">
+        <button class="btn primary" id="check">✓ Comprobar</button>
+        <button class="btn" id="hint">💡 Pista</button>
+        <button class="btn" id="reset">⟲ Reiniciar</button>
+        <button class="btn" id="voice">🔊 Voz: sí</button>
+        <span class="how">Errores: <b id="errs">0</b></span>
+      </div>
+    </section>
+  </div>
+  <section class="eqs" id="eqs" hidden></section>
+</div>
+
+<script>
+/* ================= primitivas de dibujo (devuelven SVG en texto) ================= */
+const f1=n=>Math.round(n*10)/10;
+function seg(x1,y1,x2,y2,core,fn){ // dibuja cable hasta un símbolo centrado de largo 'core'
+  const L=Math.hypot(x2-x1,y2-y1), ux=(x2-x1)/L, uy=(y2-y1)/L, nx=-uy, ny=ux, mx=(x1+x2)/2, my=(y1+y2)/2;
+  core=Math.min(core,L*0.82);
+  const a=[mx-ux*core/2,my-uy*core/2], b=[mx+ux*core/2,my+uy*core/2];
+  return `<path class="w" d="M${x1} ${y1}L${f1(a[0])} ${f1(a[1])}M${f1(b[0])} ${f1(b[1])}L${x2} ${y2}"/>`+fn(a,b,ux,uy,nx,ny,mx,my,core);
+}
+const RES=(x1,y1,x2,y2)=>seg(x1,y1,x2,y2,60,(a,b,ux,uy,nx,ny,mx,my,c)=>{ let d=`M${f1(a[0])} ${f1(a[1])}`; const amp=Math.min(9,c/6);
+  for(let i=1;i<=6;i++){ const t=(i-.5)/6*c, s=i%2?amp:-amp; d+=`L${f1(a[0]+ux*t+nx*s)} ${f1(a[1]+uy*t+ny*s)}`; } d+=`L${f1(b[0])} ${f1(b[1])}`;
+  return `<path class="sym" d="${d}"/>`; });
+const CAP=(x1,y1,x2,y2)=>seg(x1,y1,x2,y2,12,(a,b,ux,uy,nx,ny)=>
+  `<path class="sym" stroke-width="3" d="M${f1(a[0]+nx*16)} ${f1(a[1]+ny*16)}L${f1(a[0]-nx*16)} ${f1(a[1]-ny*16)}M${f1(b[0]+nx*16)} ${f1(b[1]+ny*16)}L${f1(b[0]-nx*16)} ${f1(b[1]-ny*16)}"/>`);
+const IND=(x1,y1,x2,y2)=>seg(x1,y1,x2,y2,64,(a,b,ux,uy,nx,ny,mx,my,c)=>{ let d=`M${f1(a[0])} ${f1(a[1])}`; const st=c/4, r=st/2;
+  for(let i=0;i<4;i++){ const e=[a[0]+ux*st*(i+1),a[1]+uy*st*(i+1)]; d+=`A${f1(r)} ${f1(r)} 0 0 ${ (nx>0||ny<0)?1:0} ${f1(e[0])} ${f1(e[1])}`; }
+  return `<path class="sym" d="${d}"/>`; });
+const SRC=(x,y)=>`<circle class="sym" cx="${x}" cy="${y}" r="20" fill="var(--block)"/><path class="sym" d="M${x-10} ${y}q5 -9 10 0t10 0"/>`;
+const SPRING=(x,y1,y2)=>{ const L=y2-y1, c=Math.min(70,L-16), a=y1+(L-c)/2; let d=`M${x} ${y1}V${a}`; for(let i=1;i<=8;i++) d+=`L${x+(i%2?10:-10)} ${f1(a+c*(i-.5)/8)}`; d+=`L${x} ${a+c}V${y2}`; return `<path class="sym" d="${d}"/>`; };
+const DAMP=(x,y1,y2)=>{ const m=(y1+y2)/2; return `<path class="sym" d="M${x} ${y1}V${m-6}M${x-13} ${m-6}H${x+13}M${x-17} ${m-16}V${m+12}H${x+17}V${m-16}M${x} ${m+12}V${y2}"/>`; };
+const MASS=(x1,y1,x2,y2,l)=>`<rect class="sym" x="${x1}" y="${y1}" width="${x2-x1}" height="${y2-y1}" fill="var(--block)"/><text x="${(x1+x2)/2}" y="${(y1+y2)/2+6}" text-anchor="middle" font-size="17" font-weight="600">${l}</text>`;
+const WALL=(x1,x2,y,up)=>{ let d=`M${x1} ${y}H${x2}`; for(let x=x1+4;x<x2;x+=14) d+= up?`M${x} ${y}l10 -10`:`M${x} ${y}l10 10`; return `<path class="sym" stroke-width="2" d="${d}"/>`; };
+const FARROW=(x,y1,y2)=>`<path class="sym" stroke-width="4" d="M${x} ${y1}V${y2-12}"/><path d="M${x-9} ${y2-14}L${x} ${y2}L${x+9} ${y2-14}z" fill="var(--mec)"/>`;
+const T=(x,y,t,o={})=>`<text x="${x}" y="${y}" font-size="${o.s||15}" ${o.a?`text-anchor="${o.a}"`:''} ${o.c?`fill="${o.c}"`:''} font-weight="${o.w||500}">${t.replace(/([A-Za-z])(\d+|p|s)\b/g,'$1<tspan baseline-shift="sub" font-size="70%">$2</tspan>')}</text>`;
+const W=(pts)=>`<polyline class="w" points="${pts.map(p=>p.join(',')).join(' ')}"/>`;
+const EL=(id,inner,box,nuevo)=>`<g class="el${nuevo?' nuevo':''}" data-id="${id}"><rect class="hit" x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="6"/>${inner}</g>`;
+const MESH=(x,y,l)=>`<path d="M${x+22} ${y-6}A24 24 0 1 1 ${x+14} ${y-19}" fill="none" stroke="var(--accent)" stroke-width="2"/><path d="M${x+22} ${y-6}l-1 -12l-8 8z" fill="var(--accent)"/>`+T(x,y+6,l,{a:'middle',c:'var(--accent)',w:600});
+
+/* ================= fórmulas ================= */
+const FORM={
+ RS:{n:'Resistencias en serie',c:'Rs = R1 + R2',svg:`<svg viewBox="0 0 200 40">${RES(4,20,100,20)}${RES(100,20,196,20)}</svg>`},
+ RP:{n:'Resistencias en paralelo',c:'1/Rp = 1/R1 + 1/R2  →  Rp = R1·R2/(R1+R2)',svg:`<svg viewBox="0 0 200 64">${W([[4,32],[50,32],[50,12]])}${RES(50,12,150,12)}${W([[50,32],[50,52]])}${RES(50,52,150,52)}${W([[150,12],[150,52]])}${W([[150,32],[196,32]])}</svg>`},
+ CS:{n:'Capacitores en serie',c:'1/Cs = 1/C1 + 1/C2  →  Cs = C1·C2/(C1+C2)',svg:`<svg viewBox="0 0 200 40">${CAP(4,20,100,20)}${CAP(100,20,196,20)}</svg>`},
+ CP:{n:'Capacitores en paralelo',c:'Cp = C1 + C2',svg:`<svg viewBox="0 0 200 64">${W([[4,32],[60,32],[60,12]])}${CAP(60,12,140,12)}${W([[60,32],[60,52]])}${CAP(60,52,140,52)}${W([[140,12],[140,52]])}${W([[140,32],[196,32]])}</svg>`},
+};
+let form=null;
+const fl=document.getElementById('fl');
+for(const k in FORM){ const b=document.createElement('button'); b.className='f'; b.dataset.k=k; b.setAttribute('aria-pressed','false');
+  b.innerHTML=`<b>${FORM[k].n}</b><code>${FORM[k].c}</code>${FORM[k].svg}`;
+  b.onclick=()=>{ form = form===k?null:k; fl.querySelectorAll('.f').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.k===form))); };
+  fl.appendChild(b); }
+
+/* ================= ejercicio 4: circuito (dibujo según lo simplificado) ================= */
+function circ4(fl,o={}){ // fl = {rp,cp,rs,cs}; o.labels muestra valores; devuelve SVG
+  let s='';
+  // malla 1
+  s+=W([[80,70],[80,170]])+W([[80,210],[80,310]])+EL('V',SRC(80,190)+T(46,195,'V',{a:'end'}),[52,162,56,56]);
+  s+=EL('L1',IND(80,70,360,70)+T(220,48,'L1',{a:'middle'}),[180,50,80,40]);
+  s+=EL('R1',RES(80,310,360,310)+T(220,342,'R1',{a:'middle'}),[180,290,80,40]);
+  // rama compartida
+  s+=W([[360,70],[360,96]]);
+  s+=EL('C1',CAP(360,96,360,160)+T(388,134,'C1'),[336,112,48,40]);
+  if(!fl.rp){ s+=W([[360,160],[360,182],[330,182]])+W([[360,182],[390,182]])+EL('R2',RES(330,182,330,262)+T(304,227,'R2',{a:'end'}),[314,192,32,62])+EL('R3',RES(390,182,390,262)+T(406,227,'R3'),[374,192,32,62])+W([[330,262],[390,262]])+W([[360,262],[360,310]]); }
+  else s+=EL('Rp',RES(360,160,360,310)+T(380,240,'Rp'),[340,200,40,70],fl._n==='rp');
+  // malla 2 arriba
+  if(!fl.rs) s+=EL('R4',RES(360,70,600,70)+T(480,48,'R4',{a:'middle'}),[440,50,80,40]);
+  else s+=EL('Rs',RES(360,70,600,70)+T(480,48,'Rs = R4 + R5',{a:'middle'}),[440,50,80,40],fl._n==='rs');
+  if(!fl.cs) s+=EL('C2',CAP(600,70,880,70)+T(740,44,'C2',{a:'middle'}),[716,46,48,48]);
+  else s+=W([[600,70],[880,70]]);
+  // derecha
+  if(!fl.cp && !fl.cs){ s+=W([[880,70],[880,130],[850,130]])+W([[880,130],[910,130]])+EL('C3',CAP(850,130,850,250)+T(830,195,'C3',{a:'end'}),[828,166,44,48])+EL('C4',CAP(910,130,910,250)+T(930,195,'C4'),[888,166,44,48])+W([[850,250],[910,250]])+W([[880,250],[880,310]]); }
+  else if(!fl.cs) s+=EL('Cp',CAP(880,70,880,310)+T(905,195,'Cp = C3 + C4'),[856,166,48,48],fl._n==='cp');
+  else s+=EL('Cs',CAP(880,70,880,310)+T(905,195,'Cs'),[856,166,48,48],fl._n==='cs');
+  // malla 2 abajo
+  if(!fl.rs) s+=EL('R5',RES(880,310,640,310)+T(760,342,'R5',{a:'middle'}),[720,290,80,40]);
+  else s+=W([[880,310],[640,310]]);
+  s+=EL('L2',IND(640,310,360,310)+T(500,342,'L2',{a:'middle'}),[460,290,80,40]);
+  if(o.mesh) s+=MESH(220,190,'q1')+MESH(620,190,'q2');
+  return s;
+}
+/* ================= ejercicio 3: sistema mecánico ================= */
+function mec3(){ let s='<g class="mec">';
+  s+=WALL(70,330,30,true);
+  s+=SPRING(120,30,130)+T(92,85,'K1',{a:'end'})+DAMP(240,30,130)+T(266,85,'B1');
+  s+=`<rect class="sym" x="80" y="130" width="200" height="7" fill="var(--mec)"/>`+T(292,140,'x1',{c:'var(--accent)',w:600});
+  s+=FARROW(115,145,200)+T(98,182,'F',{a:'end',s:17,w:700});
+  s+=DAMP(185,137,215)+T(210,180,'B2');
+  s+=`<circle cx="185" cy="221" r="6" fill="var(--block)" stroke="var(--mec)" stroke-width="2.5"/>`+T(200,226,'x2',{c:'var(--accent)',w:600});
+  s+=SPRING(185,227,300)+T(210,268,'K2');
+  s+=`<rect class="sym" x="110" y="300" width="150" height="38" fill="var(--block)"/>`+T(185,325,'m',{a:'middle',s:18,w:700})+T(272,325,'x3',{c:'var(--accent)',w:600});
+  s+=DAMP(140,338,405)+T(116,378,'B3',{a:'end'})+SPRING(230,338,405)+T(254,378,'K3');
+  s+=WALL(90,290,405,false);
+  return s+'</g>'; }
+
+/* ================= estado ================= */
+const $=id=>document.getElementById(id);
+const svg=$('svg');
+let P=4, phase=0, st={}, errs=0, fails=0, picked=new Set(), centers={}, chipSel=null, eqStep=0;
+const PH={4:['Simplifica','Cuenta las mallas','Traduce arrastrando','Ecuaciones'],3:['Cuenta las mallas','Traduce arrastrando','Ecuaciones']};
+function phases(){ const ph=PH[P]; $('phases').innerHTML=ph.map((n,i)=>`<span class="ph ${i<phase?'done':i===phase?'on':''}">${i+1} · ${n}</span>`).join(''); }
+function say(kind,t,p){ $('msg').className='msg '+kind; $('msg').querySelector('.t').textContent=t; $('why').textContent=p; }
+function opts(list){ $('opts').innerHTML=''; (list||[]).forEach(([lbl,fn])=>{ const b=document.createElement('button'); b.className='btn big'; b.textContent=lbl; b.onclick=fn; $('opts').appendChild(b); }); }
+
+/* ================= ejercicio 4 · fase simplificar (lazo) ================= */
+const MOVES4=[
+ {k:'RP',sel:['R2','R3'],f:'rp',why:'R2 y R3 están conectadas entre los mismos dos puntos: paralelo. Rp = R2·R3 / (R2 + R3).'},
+ {k:'CP',sel:['C3','C4'],f:'cp',why:'C3 y C4 comparten los dos extremos: paralelo. En capacitores, el paralelo se suma directo: Cp = C3 + C4.'},
+ {k:'RS',sel:['R4','R5'],f:'rs',why:'R4 y R5 están en la malla 2 y llevan la misma corriente: serie. Rs = R4 + R5.'},
+ {k:'CS',sel:['C2','Cp'],f:'cs',need:'cp',why:'C2 y Cp llevan la misma corriente de la malla 2: serie. En capacitores, la serie se suma por inversos: Cs = C2·Cp / (C2 + Cp).'},
+];
+function drawSimplify(){ svg.setAttribute('viewBox','0 0 1000 380'); const n=['rp','cp','rs','cs'].filter(k=>st[k]).length;
+  svg.innerHTML=circ4(st)+`<text x="990" y="24" text-anchor="end" font-size="15" font-weight="600" fill="${n===4?'var(--ok)':'var(--accent)'}">Combinaciones: ${n} de 4</text>`; bindEls(); }
+function bindEls(){ centers={}; svg.querySelectorAll('.el').forEach(g=>{ const b=g.getBBox(); centers[g.dataset.id]=[b.x+b.width/2,b.y+b.height/2]; }); paintPick(); }
+function paintPick(){ svg.querySelectorAll('.el').forEach(g=>g.classList.toggle('pick',picked.has(g.dataset.id))); }
+function checkSimplify(){
+  if(P==='R') return checkSimplifyR();
+  const sel=[...picked]; if(!form){ shakeSide(); say('warn','Primero la fórmula','Toca a la izquierda la fórmula que vas a usar y luego encierra los elementos.'); return; }
+  const same=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+  const mv=MOVES4.find(m=>!st[m.f] && m.k===form && same(m.sel,sel) && (!m.need||st[m.need]));
+  if(mv){ success(sel,mv.why,()=>{ st[mv.f]=true; st._n=mv.f; picked.clear(); drawSimplify(); st._n=null;
+      if(st.rp&&st.cp&&st.rs&&st.cs){ later(()=>goPhase(1),900); } }); return; }
+  // encerró los correctos y además otros: avisar sin explotar
+  const sub=MOVES4.find(m=>!st[m.f] && m.k===form && (!m.need||st[m.need]) && m.sel.every(x=>sel.includes(x)) && sel.length>m.sel.length);
+  if(sub){ const extra=sel.filter(x=>!sub.sel.includes(x)); say('warn','Casi: te sobran elementos',`Encerraste ${sub.sel.join(' y ')}, que es lo correcto, pero también ${extra.join(', ')}. Toca solo ${sub.sel.join(' y ')} y pulsa «Comprobar».`);
+    picked=new Set(sub.sel); paintPick(); return; }
+  let why='Esa combinación no aplica aquí.';
+  const types=new Set(sel.map(id=>id[0]));
+  if(types.size>1) why='No se combinan elementos de distinto tipo: resistencias con resistencias y capacitores con capacitores.';
+  else if(same(sel,['C2','C3','C4'])||same(sel,['C2','C3'])||same(sel,['C2','C4'])) why='Primero junta C3 y C4, que están en paralelo; después ese Cp queda en serie con C2.';
+  else if(same(sel,['R2','R3'])) why=form==='RS'?'R2 y R3 comparten los dos extremos: están en paralelo, no en serie.':'Esa no es la fórmula para R2 y R3.';
+  else if(same(sel,['R4','R5'])) why=form==='RP'?'R4 y R5 llevan la misma corriente (malla 2): están en serie.':'Esa no es la fórmula para R4 y R5.';
+  else if(same(sel,['C3','C4'])) why=form==='CS'?'C3 y C4 comparten los dos extremos: paralelo. Y en capacitores el paralelo se suma directo.':'Esa no es la fórmula para C3 y C4.';
+  else if(same(sel,['C2','Cp'])) why=form==='CP'?'C2 y Cp llevan la misma corriente: es serie. En capacitores, la serie va con inversos.':'Esa no es la fórmula para C2 y Cp.';
+  else if(sel.includes('C1')) why='C1 está en la rama compartida, sola en su tipo: no se combina con nada.';
+  else if(sel.some(id=>['R1','L1','L2','V'].includes(id))) why=`${sel.filter(id=>['R1','L1','L2','V'].includes(id)).join(', ')} no tiene con quién combinarse: es el único de su tipo en su malla.`;
+  if(sel.includes('R4')||sel.includes('R5')) why+=' Recuerda: R4 y R5 están lejos, pero las dos están solo en la malla 2 y llevan la misma corriente: van en serie.';
+  fail(sel,why);
+}
+
+/* ================= arrastrar y soltar (fase traducir) ================= */
+let slots=[];
+function drawTranslate(){
+  svg.innerHTML=''; slots=[];
+  if(P===4){
+    svg.setAttribute('viewBox','0 0 1000 430');
+    let s=`<g transform="translate(6,40) scale(.56)">${circ4({rp:1,cp:1,rs:1,cs:1},{mesh:1})}</g>`;
+    s+=T(270,30,'Circuito simplificado',{a:'middle',c:'var(--muted)',s:13});
+    s+=T(780,18,'Sistema mecánico: arrastra cada elemento',{a:'middle',c:'var(--muted)',s:13});
+    s+=`<g class="mec">${WALL(640,930,40,true)}${WALL(640,930,412,false)}</g>`;
+    svg.innerHTML=s;
+    // huecos: [id, x, y, w, h, tipo de dibujo, acepta, extremo superior, extremo inferior]
+    addSlot('sTop',762,48,56,70,'v',['R1'],40,126);
+    addSlot('sM1',680,126,200,44,'mass',['L1']);
+    addSlot('sF',600,110,48,76,'force',['V']);
+    addSlot('sMidA',730,174,56,76,'v',['Rp','C1'],170,254);
+    addSlot('sMidB',800,174,56,76,'v',['Rp','C1'],170,254);
+    addSlot('sM2',680,254,200,44,'mass',['L2']);
+    addSlot('sBotA',730,302,56,104,'v',['Rs','Cs'],298,412);
+    addSlot('sBotB',800,302,56,104,'v',['Rs','Cs'],298,412);
+    chips(['V','L1','R1','C1','Rp','L2','Rs','Cs'],'e');
+  } else {
+    svg.setAttribute('viewBox','0 0 1000 430');
+    let s=`<g transform="translate(10,10)">${mec3()}</g>`+T(180,30,'',{});
+    s+=T(680,24,'Circuito: arrastra cada elemento a su lugar',{a:'middle',c:'var(--muted)',s:13});
+    s+=`<g transform="translate(360,50) scale(.64)">`+
+      W([[60,50],[60,130]])+W([[60,210],[60,290]])+W([[60,50],[150,50]])+W([[230,50],[260,50]])+W([[340,50],[760,50]])+W([[880,50],[960,50],[960,130]])+W([[960,210],[960,290],[880,290]])+W([[760,290],[60,290]])+
+      W([[380,50],[380,130]])+W([[380,210],[380,290]])+W([[680,50],[680,130]])+W([[680,210],[680,290]])+
+      MESH(210,240,'q1')+MESH(530,240,'q2')+MESH(820,240,'q3')+`</g>`;
+    svg.innerHTML=s;
+    const tx=x=>360+x*.64, ty=y=>50+y*.64, sc=.64;
+    addSlot('eV',tx(32),ty(130),56*sc,80*sc,'src',['F'],null,null,1);
+    addSlot('e1a',tx(150),ty(28),80*sc,44*sc,'h',['B1','K1']);
+    addSlot('e1b',tx(260),ty(28),80*sc,44*sc,'h',['B1','K1']);
+    addSlot('e12',tx(352),ty(130),56*sc,80*sc,'v',['B2']);
+    addSlot('e23',tx(652),ty(130),56*sc,80*sc,'v',['K2']);
+    addSlot('e3L',tx(760),ty(28),120*sc,44*sc,'h',['m']);
+    addSlot('e3R',tx(932),ty(130),56*sc,80*sc,'v',['B3','K3']);
+    addSlot('e3B',tx(760),ty(268),120*sc,44*sc,'h',['B3','K3']);
+    chips(['F','K1','B1','B2','K2','m','B3','K3'],'m');
+  }
+}
+function addSlot(id,x,y,w,h,kind,acc,yt,yb){
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','slot'); g.dataset.id=id;
+  g.innerHTML=`<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/><text class="q" x="${x+w/2}" y="${y+h/2+6}" text-anchor="middle">?</text>`;
+  if((P===4||(P==='R'&&RA.dir==='e2m')) && kind==='v' && yt!=null){ // cables desde la pared o masa hasta el hueco
+    const cx=x+w/2; const c=document.createElementNS('http://www.w3.org/2000/svg','path'); c.setAttribute('class','w'); c.setAttribute('stroke','var(--mec)');
+    c.setAttribute('d',`M${cx} ${yt}V${y}M${cx} ${y+h}V${yb}`); svg.insertBefore(c,svg.firstChild); }
+  svg.appendChild(g); slots.push({id,x,y,w,h,kind,acc,el:g,full:null});
+}
+const MEMB4={V:'fuente',L1:'m1',L2:'m2',R1:'own1',C1:'sh',Rp:'sh',Rs:'own2',Cs:'own2'};
+const SLOTZ4={sTop:'own1',sM1:'m1',sF:'fuente',sMidA:'sh',sMidB:'sh',sM2:'m2',sBotA:'own2',sBotB:'own2'};
+const MEMB3={F:'fuente',K1:'own1',B1:'own1',B2:'s12',K2:'s23',m:'mass',B3:'own3',K3:'own3'};
+const SLOTZ3={eV:'fuente',e1a:'own1',e1b:'own1',e12:'s12',e23:'s23',e3L:'mass',e3R:'own3',e3B:'own3'};
+function chips(ids,cls){ const tr=$('tray'); tr.hidden=false; tr.innerHTML=`<span class="lbl">${(P===4||(P==='R'&&RA.dir==='e2m'))?'Elementos del circuito':'Elementos mecánicos'}</span>`;
+  ids.forEach(id=>{ const c=document.createElement('button'); c.className='chip '+cls; c.dataset.id=id; c.innerHTML=id.replace(/(\d+|p|s)$/,'<sub>$1</sub>'); tr.appendChild(c); bindDrag(c); }); }
+let ghost=null, dragId=null, dragPid=null, dragMoved=false, sx=0, sy=0;
+function bindDrag(c){
+  c.addEventListener('pointerdown',ev=>{ if(ev.button>0) return; ev.preventDefault(); dragId=c.dataset.id; dragPid=ev.pointerId; dragMoved=false; sx=ev.clientX; sy=ev.clientY;
+    try{ c.setPointerCapture(ev.pointerId); }catch(e){} document.body.classList.add('dragging'); });
+  c.addEventListener('pointermove',ev=>{ if(dragId!==c.dataset.id||ev.pointerId!==dragPid) return;
+    if(!dragMoved && Math.hypot(ev.clientX-sx,ev.clientY-sy)>6){ dragMoved=true; ghost=c.cloneNode(true); ghost.classList.add('ghost'); document.body.appendChild(ghost); }
+    if(ghost){ ghost.style.left=ev.clientX+'px'; ghost.style.top=ev.clientY+'px'; slots.forEach(s=>s.el.classList.toggle('over',!s.full&&hitSlot(s,ev))); } });
+  const end=ev=>{ if(dragId!==c.dataset.id) return; document.body.classList.remove('dragging'); slots.forEach(s=>s.el.classList.remove('over'));
+    const id=dragId; dragId=null; if(ghost){ ghost.remove(); ghost=null; }
+    if(!dragMoved){ // modo tocar: elige ficha y luego toca un hueco
+      chipSel = chipSel===id?null:id; document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('sel',x.dataset.id===chipSel));
+      if(chipSel) say('warn','Ficha elegida',`Ahora toca el hueco donde va ${id}.`); return; }
+    const s=slots.find(s=>!s.full&&hitSlot(s,ev)); if(s) drop(id,s); };
+  c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
+}
+svg.addEventListener('click',ev=>{ if(!chipSel) return; const g=ev.target.closest('.slot'); if(!g) return; const s=slots.find(x=>x.id===g.dataset.id); if(s&&!s.full){ const id=chipSel; chipSel=null; document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel')); drop(id,s); } });
+function hitSlot(s,ev){ const r=s.el.querySelector('rect').getBoundingClientRect(); const pad=10; return ev.clientX>r.left-pad&&ev.clientX<r.right+pad&&ev.clientY>r.top-pad&&ev.clientY<r.bottom+pad; }
+function drop(id,s){
+  const r=s.el.querySelector('rect').getBoundingClientRect(), box=svg.getBoundingClientRect(), vb=svg.viewBox.baseVal;
+  const cx=s.x+s.w/2, cy=s.y+s.h/2;
+  if(s.acc.includes(id)){
+    s.full=id; s.el.classList.add('full','nuevo'); s.el.querySelector('.q').remove(); s.el.insertAdjacentHTML('beforeend',symbolFor(id,s));
+    document.querySelector(`.chip[data-id="${id}"]`).classList.add('used'); sparks(cx,cy,'ok');
+    const why=explainOk(id); say('ok','¡Bien!',why); speak(why); fails=0;
+    if(slots.every(x=>x.full)) later(()=>goPhase(P===4?3:P===3?2:phase+1),900);
+  } else { errs++; fails++; $('errs').textContent=errs; const why=explainBad(id,s); boomAt(cx,cy); say('bad','¡Boom! Ahí no va',why); speak(why); }
+}
+function symbolFor(id,s){ if(P==='R') return symbolR(id,s); const {x,y,w,h}=s, cx=x+w/2, cy=y+h/2;
+  if(P===4){ // eléctrico → mecánico
+    const lab={V:'F = V',L1:'m1 = L1',L2:'m2 = L2',R1:'b1 = R1',C1:'k12 = 1/C1',Rp:'b12 = Rp',Rs:'b2 = Rs',Cs:'k2 = 1/Cs'}[id];
+    if(s.kind==='mass') return `<g class="mec">${MASS(x,y,x+w,y+h,'')}</g>`+T(cx,cy+6,lab,{a:'middle',s:15,w:600});
+    if(s.kind==='force') return `<g class="mec">${FARROW(cx,y,y+h)}</g>`+T(x-6,cy+5,lab,{a:'end',s:13,w:600});
+    const isR=id[0]==='R', top=y-4, bot=y+h+4; // R → amortiguador, C → resorte
+    return `<g class="mec">${isR?DAMP(cx,top,bot):SPRING(cx,top,bot)}</g>`+T(cx+(cx>780?32:-32),cy+4,lab,{a:cx>780?'start':'end',s:12.5,w:600});
+  } else { // mecánico → eléctrico
+    const lab={F:'V = F',K1:'C1 = 1/K1',B1:'R1 = B1',B2:'R2 = B2',K2:'C2 = 1/K2',m:'L = m',B3:'R3 = B3',K3:'C3 = 1/K3'}[id];
+    const t=id[0]; let sym='';
+    if(s.kind==='src') sym=SRC(cx,cy).replace('r="20"','r="14"');
+    else if(s.kind==='h'){ const a=[x,cy],b=[x+w,cy]; sym= t==='B'?RES(a[0],cy,b[0],cy):t==='K'?CAP(a[0],cy,b[0],cy):IND(a[0],cy,b[0],cy); }
+    else { sym= t==='B'?RES(cx,y,cx,y+h):CAP(cx,y,cx,y+h); }
+    const right = s.kind!=='h' && cx>800 && s.id!=='e3R';
+    const lx = s.kind==='h'?cx:cx+(right?22:-22), ly = s.kind==='h'? (y<200?y-6:y+h+16) : cy+4;
+    return sym+T(lx,ly,lab,{a:s.kind==='h'?'middle':(right?'start':'end'),s:12,w:600,c:'var(--accent)'});
+  }
+}
+function explainOk(id){
+  if(P==='R') return explainOkR(id);
+  if(P===4) return ({V:'El voltaje de la fuente es la fuerza F que empuja a la masa 1.',L1:'L1 es la inductancia de la malla 1: es la masa m1.',L2:'L2 es la inductancia de la malla 2: es la masa m2.',
+   R1:'R1 está solo en la malla 1: es un amortiguador que va de m1 a la pared.',C1:'C1 está en la rama compartida: es un resorte entre m1 y m2, con k = 1/C1.',
+   Rp:'Rp está en la rama compartida: es un amortiguador entre m1 y m2.',Rs:'Rs está solo en la malla 2: amortiguador de m2 a la pared.',Cs:'Cs está solo en la malla 2: resorte de m2 a la pared, con k = 1/Cs.'})[id];
+  return ({F:'La fuerza F es el voltaje de la fuente, en la malla 1 (la placa, x1).',K1:'K1 une la placa (x1) con la pared: es propio de la malla 1. Resorte → capacitor C = 1/K1.',
+   B1:'B1 une la placa con la pared: propio de la malla 1. Amortiguador → resistencia R = B1.',B2:'B2 une x1 con x2: va en la rama compartida entre las mallas 1 y 2.',
+   K2:'K2 une x2 con la masa (x3): va en la rama compartida entre las mallas 2 y 3.',m:'La masa es una inductancia, L = m, en la malla 3.',
+   B3:'B3 une la masa con el piso: propio de la malla 3.',K3:'K3 une la masa con el piso: propio de la malla 3, C = 1/K3.'})[id];
+}
+function explainBad(id,s){
+  if(P==='R') return explainBadR(id,s);
+  const memb=(P===4?MEMB4:MEMB3)[id], zone=(P===4?SLOTZ4:SLOTZ3)[s.id];
+  const name={own1:'solo de la malla 1',own2:'solo de la malla 2',own3:'solo de la malla 3',sh:'de la rama compartida entre m1 y m2',s12:'de la rama compartida entre las mallas 1 y 2',s23:'de la rama compartida entre las mallas 2 y 3',m1:'la masa 1',m2:'la masa 2',mass:'la masa',fuente:'la fuente'};
+  if(P===4){
+    if(id[0]==='L' && s.kind!=='mass') return `${id} es una inductancia: su análogo es una masa, no un resorte ni un amortiguador.`;
+    if(id==='V') return 'El voltaje de la fuente es la fuerza F: va en la flecha que empuja a m1.';
+    if(s.kind==='mass') return 'En ese hueco va una masa, y las masas vienen de las inductancias (L).';
+    if(s.kind==='force') return 'Ahí va la fuerza, que viene del voltaje V.';
+    if(memb!==zone) return `${id} es ${name[memb]}, y ese hueco es ${name[zone]}. Revisa en qué malla está ${id} en el circuito.`;
+    return 'Ese hueco no es para ese elemento.';
+  }
+  if(id==='m' && s.kind!=='h') return 'La masa es una inductancia: va arriba en la malla 3.';
+  if(id==='F') return 'La fuerza es la fuente de voltaje: va en el lado izquierdo de la malla 1.';
+  if(s.kind==='src') return 'Ahí va la fuente, que viene de la fuerza F.';
+  if(memb!==zone) return `${id} es ${name[memb]}, y ese hueco es ${name[zone]}. Mira entre qué puntos (x1, x2, x3 o la pared) está conectado ${id}.`;
+  return 'Ese hueco no es para ese elemento.';
+}
+
+/* ================= fases ================= */
+function goPhase(n){ if(P==='R') return goPhaseR(n); phase=n; phases(); picked.clear(); fails=0; $('tray').hidden=true; opts(); $('check').hidden=false;
+  if(P===4){
+    if(n===0){ drawSimplify(); say('','Fase 1 · Simplifica','Elige una fórmula a la izquierda y encierra con el mouse los dos elementos que se combinan. Hay cuatro combinaciones.'); }
+    if(n===1){ $('check').hidden=true; svg.setAttribute('viewBox','0 0 1000 380'); svg.innerHTML=circ4({rp:1,cp:1,rs:1,cs:1},{mesh:1});
+      say('','Fase 2 · ¿Cuántas masas?','El circuito ya está simplificado. ¿Cuántas masas tendrá el sistema mecánico?');
+      opts([['1',()=>quiz(false,'Cuenta las mallas: cada malla cerrada es una masa.')],['2',()=>quiz(true,'Dos mallas, q1 y q2 → dos masas, m1 = L1 y m2 = L2.')],['3',()=>quiz(false,'Solo hay dos mallas cerradas, así que son dos masas.')]]); }
+    if(n===2){ $('check').hidden=true; drawTranslate(); say('','Fase 3 · Traduce','Arrastra cada elemento del circuito a su lugar en el sistema mecánico. L → masa, R → amortiguador, C → resorte, V → fuerza. Lo que es solo de una malla va a la pared; lo compartido va entre las masas.'); }
+    if(n===3) eqBuilder();
+  } else {
+    if(n===0){ $('check').hidden=true; svg.setAttribute('viewBox','0 0 1000 430'); svg.innerHTML=`<g transform="translate(330,6)">${mec3()}</g>`;
+      say('','Fase 1 · ¿Cuántas mallas?','Cada punto que se mueve por su cuenta es una malla. La placa donde actúa F no tiene masa (no lleva m), pero se mueve. ¿Cuántas mallas tendrá el circuito?');
+      opts([['2',()=>quiz(false,'Faltan puntos: la placa (x1), el punto entre B2 y K2 (x2) y la masa (x3) se mueven cada uno por su cuenta.')],['3',()=>quiz(true,'Tres puntos se mueven por su cuenta: la placa x1, el punto x2 entre B2 y K2, y la masa x3. Tres mallas.')],['4',()=>quiz(false,'La pared y el piso no se mueven: no cuentan. Son tres puntos móviles.')]]); }
+    if(n===1){ $('check').hidden=true; drawTranslate(); say('','Fase 2 · Traduce','Arrastra cada elemento mecánico a su lugar en el circuito. Lo que une un punto con la pared va en su propia malla; lo que une dos puntos va en la rama compartida.'); }
+    if(n===2) eqBuilder();
+  }
+}
+
+/* ================= escribir las ecuaciones (fase final) ================= */
+const EQB = {
+ 4:{coefs:['m1','b1','b12','k12','m2','b2','k2'],
+    el:{m1:{t:'m',a:1},m2:{t:'m',a:2},b1:{t:'b',a:1,b:0},b12:{t:'b',a:1,b:2},b2:{t:'b',a:2,b:0},k12:{t:'k',a:1,b:2},k2:{t:'k',a:2,b:0}},
+    pts:[1,2], rhs:{1:'F',2:'0'}, name:{1:'m₁',2:'m₂'}, pairs:[[1,2]]},
+ 3:{coefs:['K1','B1','B2','K2','m','B3','K3'],
+    el:{m:{t:'m',a:3},K1:{t:'k',a:1,b:0},B1:{t:'b',a:1,b:0},B2:{t:'b',a:1,b:2},K2:{t:'k',a:2,b:3},B3:{t:'b',a:3,b:0},K3:{t:'k',a:3,b:0}},
+    pts:[1,2,3], rhs:{1:'F',2:'0',3:'0'}, name:{1:'x₁ (la placa)',2:'x₂ (el punto entre B₂ y K₂)',3:'x₃ (la masa m)'}, pairs:[[1,2],[2,3]]},
+};
+const SUBD={0:'₀',1:'₁',2:'₂',3:'₃',4:'₄',5:'₅',6:'₆',7:'₇',8:'₈',9:'₉'};
+const sb=s=>String(s).replace(/\d/g,d=>SUBD[d]);
+const fc=c=>c.replace(/^([A-Za-z])(\d*)$/,(m,a,d)=>a+sb(d));
+function fv(v){ const t=v[0];
+  if(t==='a') return 'ẍ'+sb(v[1]); if(t==='v') return 'ẋ'+sb(v[1]); if(t==='x') return 'x'+sb(v[1]);
+  const i=v[2], j=v[3]; return v[1]==='v' ? `(ẋ${sb(i)} − ẋ${sb(j)})` : `(x${sb(i)} − x${sb(j)})`; }
+const fterm=(c,v)=>fc(c)+fv(v);
+function expected(i){ const D=EQB[P], out=new Set();
+  for(const c in D.el){ const e=D.el[c];
+    if(e.t==='m'){ if(e.a===i) out.add(c+'|a'+i); continue; }
+    if(e.a!==i && e.b!==i) continue; const o=e.a===i?e.b:e.a;
+    out.add(c+'|'+(o===0 ? (e.t==='b'?'v':'x')+i : 'd'+(e.t==='b'?'v':'x')+i+o)); }
+  return out; }
+function diagnose(c,v,i){ const D=EQB[P], e=D.el[c], nm=D.name[i], C=fc(c);
+  const order=v[0]==='a'?2:(v[0]==='v'||v.startsWith('dv'))?1:0, need={m:2,b:1,k:0}[e.t];
+  const what={m:'la masa multiplica la aceleración: dos puntos (ẍ)',b:'el amortiguador multiplica la velocidad: un punto (ẋ)',k:'el resorte multiplica el desplazamiento: sin punto (x)'}[e.t];
+  const touches = e.t==='m' ? e.a===i : (e.a===i||e.b===i);
+  if(!touches) return `${C} no está conectado a ${nm}: no va en esta ecuación.`;
+  if(order!==need) return `${C}: ${what}.`;
+  if(e.t==='m') return `La masa va con la aceleración de su propio punto: ${C}ẍ${sb(i)}.`;
+  const o=e.a===i?e.b:e.a, diff=v[0]==='d';
+  if(o===0 && diff) return `${C} va de ${nm} a la pared: no lleva resta, solo ${fterm(c,(e.t==='b'?'v':'x')+i)}.`;
+  const pn=n=>(P===4?'m':'x')+sb(n);
+  if(o!==0 && !diff) return `${C} une ${pn(i)} y ${pn(o)}: multiplica la diferencia, ${fterm(c,'d'+(e.t==='b'?'v':'x')+i+o)}.`;
+  if(diff && v[2]!=String(i)) return `En la ecuación de ${nm} la resta empieza por la x de esta ecuación: ${fterm(c,'d'+(e.t==='b'?'v':'x')+i+o)}.`;
+  if(!diff && v[1]!=String(i)) return `Usa la x de esta ecuación (${sb(i)}), no la de otro punto.`;
+  return `Revisa el término ${fterm(c,v)}.`; }
+let EB=null;
+function eqBuilder(){
+  phase=PH[P].length-1; phases(); $('tray').hidden=true; $('check').hidden=true;
+  const D=EQB[P]; EB={line:0, terms:D.pts.map(()=>[]), rhs:D.pts.map(()=>null), coef:null, done:D.pts.map(()=>false), fails:0};
+  const vars=[]; D.pts.forEach(i=>vars.push('a'+i,'v'+i,'x'+i)); D.pairs.forEach(([i,j])=>vars.push('dv'+i+j,'dx'+i+j,'dv'+j+i,'dx'+j+i));
+  const conn=Object.entries(D.el).map(([c,e])=>`<tr><td>${fc(c)}</td><td>${e.t==='m'?'masa en '+(P===4?D.name[e.a]:'x'+sb(e.a)):e.b===0?`${P===4?D.name[e.a]:'x'+sb(e.a)} con la pared`:`entre ${P===4?D.name[e.a]:'x'+sb(e.a)} y ${P===4?D.name[e.b]:'x'+sb(e.b)}`}</td></tr>`).join('');
+  const box=$('eqs'); box.hidden=false;
+  box.innerHTML=`<h3>Escribe las ecuaciones · Ejercicio ${P}</h3>
+   <div class="cols">
+     <div><h4 style="font:700 14px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;color:var(--mec)">La tablita</h4>
+       <table class="eq tab2"><tr><td>Masa m</td><td>m·ẍ (dos puntos)</td></tr><tr><td>Amortiguador b</td><td>b·ẋ (un punto)</td></tr><tr><td>Resorte k</td><td>k·x (sin punto)</td></tr>
+       <tr><td>Conectado a la pared</td><td>solo la x de ese punto</td></tr><tr><td>Conectado entre dos puntos</td><td>la resta, empezando por el de la ecuación: (x₁ − x₂)</td></tr>
+       <tr><td>Lado derecho</td><td>la fuerza que lo empuja (F); si no hay, 0</td></tr></table>
+       ${P===3?'<p class="note" style="margin:8px 0 0;font-size:13.5px">x₂ no tiene masa: su ecuación no lleva término m·ẍ.</p>':''}
+       <details style="margin-top:8px"><summary style="cursor:pointer;font:500 13px var(--mono)">Ver tablita de conexiones (de qué a qué va cada elemento)</summary><table class="eq tab2">${conn}</table></details></div>
+     <div id="eblines"></div>
+   </div>
+   <div class="builder" id="ebpad">
+     <div><span class="lbl">1 · Coeficiente</span><div class="row" id="ebc">${D.coefs.map(c=>`<button class="tk c" data-c="${c}">${fc(c)}</button>`).join('')}</div></div>
+     <div><span class="lbl">2 · Multiplica a</span><div class="row" id="ebv">${vars.map(v=>`<button class="tk v" data-v="${v}">${fv(v)}</button>`).join('')}</div></div>
+     <div><span class="lbl">3 · Lado derecho</span><div class="row"><button class="tk r" data-r="F">= F</button><button class="tk r" data-r="0">= 0</button>
+       <button class="btn primary" id="ebchk">✓ Comprobar ecuación</button><button class="btn" id="ebdel">⌫ Quitar último</button><button class="btn" id="ebclr">Borrar línea</button></div></div>
+   </div>`;
+  box.querySelectorAll('.tk.c').forEach(b=>b.onclick=()=>{ EB.coef=b.dataset.c; box.querySelectorAll('.tk.c').forEach(x=>x.classList.toggle('on',x===b)); });
+  box.querySelectorAll('.tk.v').forEach(b=>b.onclick=()=>{ if(!EB.coef){ say('warn','Primero el coeficiente','Toca el coeficiente (m, b o k) y luego lo que multiplica.'); return; }
+    EB.terms[EB.line].push(EB.coef+'|'+b.dataset.v); EB.coef=null; box.querySelectorAll('.tk.c').forEach(x=>x.classList.remove('on')); drawLines(); });
+  box.querySelectorAll('.tk.r').forEach(b=>b.onclick=()=>{ EB.rhs[EB.line]=b.dataset.r; drawLines(); });
+  $('ebdel').onclick=()=>{ EB.terms[EB.line].pop(); drawLines(); };
+  $('ebclr').onclick=()=>{ EB.terms[EB.line]=[]; EB.rhs[EB.line]=null; drawLines(); };
+  $('ebchk').onclick=checkLine;
+  drawLines();
+  say('', P===4?'Fase 4 · Escribe las ecuaciones':'Fase 3 · Escribe las ecuaciones', P===4?'Una ecuación por cada masa. Arma cada término: toca el coeficiente y luego lo que multiplica. Al final elige el lado derecho y comprueba. Mira el sistema mecánico de arriba.':'Una ecuación por cada punto que se mueve (x₁, x₂, x₃). Arma los términos mirando el dibujo y la tablita.');
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function drawLines(){ const D=EQB[P];
+  $('eblines').innerHTML=D.pts.map((i,k)=>{ const t=EB.terms[k], r=EB.rhs[k];
+    const body = t.length ? t.map(x=>{ const [c,v]=x.split('|'); return `<span class="term">${fterm(c,v)}</span>`; }).join(' <span class="plus">+</span> ') : '<span class="ph2">toca un coeficiente y luego lo que multiplica…</span>';
+    return `<div class="eline ${k===EB.line?'act':''} ${EB.done[k]?'ok':''}" data-k="${k}"><span class="who">Ecuación de ${D.name[i]}</span><div class="expr">${body} <span class="plus">=</span> <b>${r??'?'}</b></div></div>`; }).join('');
+  $('eblines').querySelectorAll('.eline').forEach(el=>el.onclick=()=>{ const k=+el.dataset.k; if(!EB.done[k]){ EB.line=k; drawLines(); } }); }
+function checkLine(){ const D=EQB[P], k=EB.line, i=D.pts[k], S=new Set(EB.terms[k]), E=expected(i);
+  if(!S.size){ say('warn','Línea vacía','Agrega los términos primero.'); return; }
+  const wrong=[...S].filter(x=>!E.has(x)), missing=[...E].filter(x=>!S.has(x)), rhsOk=EB.rhs[k]===D.rhs[i];
+  const lineEl=$('eblines').querySelector(`.eline[data-k="${k}"]`);
+  if(!wrong.length && !missing.length && rhsOk && S.size===EB.terms[k].length){
+    EB.done[k]=true; EB.fails=0; sparks(500,200,'ok'); const msg=`¡Ecuación de ${D.name[i]} correcta!`; say('ok','¡Bien!',msg); speak(msg);
+    const nx=EB.done.findIndex(d=>!d); if(nx<0){ drawLines(); later(()=>{ say('ok','¡Todas las ecuaciones!','Las escribiste tú. Abajo está el análogo completo para repasar.'); speak('Todas las ecuaciones correctas.'); showEqs(true); },900); return; }
+    EB.line=nx; drawLines(); return; }
+  errs++; EB.fails++; $('errs').textContent=errs; boomAt(500,200);
+  if(lineEl){ lineEl.classList.remove('shake2'); void lineEl.offsetWidth; lineEl.classList.add('shake2'); }
+  let why;
+  if(S.size!==EB.terms[k].length) why='Tienes un término repetido.';
+  else if(wrong.length){ const [c,v]=wrong[0].split('|'); why=diagnose(c,v,i); }
+  else if(missing.length) why = `Te falta${missing.length>1?'n':''} ${missing.length} término${missing.length>1?'s':''}. Revisa en el dibujo qué elementos tocan a ${D.name[i]}.` + (EB.fails>=2 ? ` Pista: falta lo de ${missing.map(x=>fc(x.split('|')[0])).join(', ')}.`:'');
+  else why = D.rhs[i]==='F' ? `El lado derecho es la fuerza que empuja a ${D.name[i]}: F.` : `A ${D.name[i]} no la empuja ninguna fuerza externa: el lado derecho es 0.`;
+  say('bad','¡Boom!',why); speak(why); }
+function quiz(ok,why){ if(ok){ sparks(500,200,'ok'); say('ok','¡Correcto!',why); speak(why); opts(); later(()=>goPhase(phase+1),1400); }
+  else { errs++; $('errs').textContent=errs; boomAt(500,200); say('bad','¡Boom!',why); speak(why); } }
+
+function showEqs(after){
+  phase=PH[P].length-1; phases(); $('tray').hidden=true; $('check').hidden=true;
+  const keep = after ? $('eqs').innerHTML : '';
+  const E = P===4 ? {
+    e:['V = L₁q̈₁ + R₁q̇₁ + Rp(q̇₁ − q̇₂) + (1/C₁)(q₁ − q₂)','0 = L₂q̈₂ + Rs·q̇₂ + (1/Cs)q₂ + Rp(q̇₂ − q̇₁) + (1/C₁)(q₂ − q₁)'],
+    m:['F = m₁ẍ₁ + b₁ẋ₁ + b₁₂(ẋ₁ − ẋ₂) + k₁₂(x₁ − x₂)','0 = m₂ẍ₂ + b₂ẋ₂ + k₂x₂ + b₁₂(ẋ₂ − ẋ₁) + k₁₂(x₂ − x₁)'],
+    map:'F = V · m₁ = L₁ · b₁ = R₁ · b₁₂ = Rp = R₂R₃/(R₂+R₃) · k₁₂ = 1/C₁ · m₂ = L₂ · b₂ = Rs = R₄ + R₅ · k₂ = 1/Cs = 1/C₂ + 1/(C₃ + C₄)',
+    steps:['Paralelo R₂‖R₃ → Rp = R₂R₃/(R₂+R₃).','Paralelo C₃‖C₄ → Cp = C₃ + C₄.','Serie R₄ + R₅ → Rs.','Serie C₂ con Cp → Cs = C₂Cp/(C₂+Cp).','Dos mallas → dos masas: m₁ = L₁ y m₂ = L₂.','Malla 1 sola: R₁ → amortiguador de m₁ a la pared. Rama compartida: Rp y C₁ → amortiguador y resorte entre m₁ y m₂. Malla 2 sola: Rs y Cs → amortiguador y resorte de m₂ a la pared.','Ecuaciones de malla y sus análogas mecánicas.'],
+    first:'e'} : {
+    m:['F = K₁x₁ + B₁ẋ₁ + B₂(ẋ₁ − ẋ₂)','0 = B₂(ẋ₂ − ẋ₁) + K₂(x₂ − x₃)','0 = mẍ₃ + B₃ẋ₃ + K₃x₃ + K₂(x₃ − x₂)'],
+    e:['V = R₁q̇₁ + (1/C₁)q₁ + R₂(q̇₁ − q̇₂)','0 = R₂(q̇₂ − q̇₁) + (1/C₂)(q₂ − q₃)','0 = Lq̈₃ + R₃q̇₃ + (1/C₃)q₃ + (1/C₂)(q₃ − q₂)'],
+    map:'V = F · R₁ = B₁ · C₁ = 1/K₁ · R₂ = B₂ · C₂ = 1/K₂ · L = m · R₃ = B₃ · C₃ = 1/K₃',
+    steps:['Tres puntos móviles (placa x₁, punto x₂ y masa x₃) → tres mallas q₁, q₂, q₃.','Lo que une un punto con la pared va en su propia malla: K₁, B₁ y F en la malla 1; m, B₃ y K₃ en la malla 3.','Lo que une dos puntos va en la rama compartida: B₂ entre las mallas 1 y 2; K₂ entre las mallas 2 y 3.','La malla 2 no tiene elementos propios: el punto x₂ no tiene masa.','Ecuaciones: cada término mecánico pasa a su análogo eléctrico.'],
+    first:'m'};
+  const col=(k,h)=>`<div class="col ${k}"><h4>${h}</h4>${E[k].map(l=>`<div class="line hid">${l}</div>`).join('')}</div>`;
+  const order = E.first==='e' ? col('e','Ecuaciones de malla (eléctrico)')+col('m','Sistema mecánico análogo') : col('m','Ecuaciones del sistema mecánico')+col('e','Circuito análogo (mallas)');
+  const box=$('eqs'); box.hidden=false;
+  box.innerHTML=(after?`<div class="mine">${keep}</div>`:'')+`<h3>Ejercicio ${P} · el análogo completo</h3><div class="cols">${order}</div><div class="map">${E.map}</div>
+    <div><b>Así lo escribes en el parcial:</b><ol class="steps">${E.steps.map(s=>`<li>${s}</li>`).join('')}</ol></div>
+    <div><button class="btn primary" id="nextline">Revelar la siguiente ecuación</button> <button class="btn" id="allline">Mostrar todas</button></div>`;
+  const lines=[...box.querySelectorAll('.line')]; let i=0;
+  const next=()=>{ if(i<lines.length){ lines[i].classList.remove('hid'); i++; } if(i>=lines.length) $('nextline').disabled=true; };
+  $('nextline').onclick=next; $('allline').onclick=()=>{ while(i<lines.length) next(); };
+  if(after){ box.querySelectorAll('.mine #ebpad').forEach(x=>x.remove()); }
+  say('ok','¡Sistema completo!',`Terminaste con ${errs} error${errs===1?'':'es'}. Abajo tienes las ecuaciones, una columna frente a la otra: cada término tiene su análogo.`);
+  if(!after) speak('Sistema completo. Revisa las ecuaciones abajo.'); sparks(500,200,'ok'); box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ================= lazo (fase simplificar) ================= */
+let pts=[], drawing=false, moved=false, pid=null, downEl=null;
+function toSvg(ev){ const p=svg.createSVGPoint(); p.x=ev.clientX; p.y=ev.clientY; const q=p.matrixTransform(svg.getScreenCTM().inverse()); return [q.x,q.y]; }
+function clearLasso(){ svg.querySelectorAll('polygon.lasso').forEach(p=>p.remove()); }
+svg.addEventListener('pointerdown',ev=>{ if(!((P===4&&phase===0)||(P==='R'&&RA&&RA.simp))||ev.button>0) return; ev.preventDefault(); clearLasso(); drawing=true; moved=false; pts=[toSvg(ev)]; pid=ev.pointerId;
+  const h=ev.target.closest&&ev.target.closest('.el'); downEl=h?h.dataset.id:null;
+  const pl=document.createElementNS('http://www.w3.org/2000/svg','polygon'); pl.setAttribute('class','lasso'); svg.appendChild(pl);
+  try{ svg.setPointerCapture(ev.pointerId); }catch(e){} document.body.classList.add('dragging'); });
+window.addEventListener('pointermove',ev=>{ if(!drawing||ev.pointerId!==pid) return; const p=toSvg(ev), l=pts[pts.length-1];
+  if(Math.hypot(p[0]-l[0],p[1]-l[1])>4){ pts.push(p); const pl=svg.querySelector('polygon.lasso'); if(pl) pl.setAttribute('points',pts.map(q=>q.join(',')).join(' ')); if(pts.length>6) moved=true; } });
+window.addEventListener('pointerup',ev=>{ if(drawing&&ev.pointerId===pid) endLasso(false); });
+window.addEventListener('pointercancel',()=>{ if(drawing) endLasso(true); });
+window.addEventListener('blur',()=>{ if(drawing) endLasso(true); });
+function endLasso(cancel){ drawing=false; document.body.classList.remove('dragging'); const poly=pts.slice(); clearLasso(); if(cancel) return;
+  if(!moved){ if(downEl){ picked.has(downEl)?picked.delete(downEl):picked.add(downEl); paintPick(); say('warn','Selección',`Llevas ${picked.size}. Pulsa «Comprobar» o encierra con el mouse.`); } return; }
+  picked=new Set(Object.keys(centers).filter(id=>inside(centers[id],poly))); paintPick();
+  if(!picked.size){ say('warn','Nada encerrado','Dibuja el lazo alrededor de los elementos.'); return; }
+  checkSimplify(); }
+function inside([x,y],poly){ let c=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){ const [xi,yi]=poly[i],[xj,yj]=poly[j]; if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) c=!c; } return c; }
+$('check').onclick=()=>{ if((P===4&&phase===0)||(P==='R'&&RA&&RA.simp)){ if(!picked.size){ say('warn','Sin selección','Encierra o toca los elementos.'); return; } checkSimplify(); } };
+
+/* ================= éxito / error / efectos ================= */
+function success(sel,why,after){ const c=sel.map(id=>centers[id]); const cx=c.reduce((a,p)=>a+p[0],0)/c.length, cy=c.reduce((a,p)=>a+p[1],0)/c.length;
+  sparks(cx,cy,'ok'); say('ok',`${FORM[form].n}: ¡bien!`,why); speak(why); fails=0; form=null; fl.querySelectorAll('.f').forEach(x=>x.setAttribute('aria-pressed','false')); later(after,350); }
+function fail(sel,why){ errs++; fails++; $('errs').textContent=errs; const c=(sel.length?sel:Object.keys(centers)).map(id=>centers[id]);
+  boomAt(c.reduce((a,p)=>a+p[0],0)/c.length, c.reduce((a,p)=>a+p[1],0)/c.length);
+  svg.querySelectorAll('.el').forEach(g=>g.classList.toggle('bad',picked.has(g.dataset.id)));
+  let extra=''; if(fails>=2) extra=' '+hintText(); say('bad','¡Boom!',why+extra); speak(why);
+  setTimeout(()=>{ picked.clear(); paintPick(); svg.querySelectorAll('.el.bad').forEach(g=>g.classList.remove('bad')); },700); }
+function shakeSide(){ $('side').classList.remove('shake'); void $('side').offsetWidth; $('side').classList.add('shake'); }
+function hintText(){
+  if(P==='R'&&RA&&RA.simp){ const p=Object.entries(RA.pairs).find(([k])=>!RA.st[k]); if(p){ const [k,kind]=p, t=k[0]==='R'?'Resistencias':'Capacitores';
+      return `Pista: ${dn(k+'a')} y ${dn(k+'b')} están en ${kind}. Elige «${t} en ${kind}» y encierra (o toca) esos dos.`; } }
+  if(P===4&&phase===0){ const m=MOVES4.find(m=>!st[m.f]&&(!m.need||st[m.need]));
+    if(m.f==='rs') return 'Pista: falta R4 con R5. No están pegadas, pero las dos están solo en la malla 2 (la misma corriente q2 pasa por ambas): es una serie. Elige «Resistencias en serie», toca R4, toca R5 y pulsa «Comprobar».';
+    return `Pista: prueba «${FORM[m.k].n}» con ${m.sel.join(' y ')}.`; }
+  if(slots.length){ return 'Pista: mira entre qué dos cosas está conectado el elemento (pared, masa o punto). Eso dice si es propio de una malla o compartido.'; }
+  return 'Pista: cuenta los puntos que se mueven o las mallas cerradas.'; }
+const fx=$('fx'), ctx=fx.getContext('2d'); let parts=[], raf=null;
+function sizeFx(){ const r=fx.getBoundingClientRect(); fx.width=r.width*devicePixelRatio; fx.height=r.height*devicePixelRatio; }
+function px(x,y){ const vb=svg.viewBox.baseVal, r=svg.getBoundingClientRect(); return [(x-vb.x)/vb.width*r.width*devicePixelRatio,(y-vb.y)/vb.height*r.height*devicePixelRatio]; }
+function sparks(x,y,kind){ sizeFx(); const [a,b]=px(x,y), cs=getComputedStyle(document.documentElement);
+  const cols= kind==='ok'?[cs.getPropertyValue('--ok'),cs.getPropertyValue('--sel')]:[cs.getPropertyValue('--bad'),cs.getPropertyValue('--sel'),'#ffd27a','#444'];
+  const n=kind==='ok'?40:110; for(let i=0;i<n;i++){ const t=Math.random()*Math.PI*2, sp=(kind==='ok'?3:6+Math.random()*9)*devicePixelRatio*(.4+Math.random());
+    parts.push({x:a,y:b,vx:Math.cos(t)*sp,vy:Math.sin(t)*sp-(kind==='ok'?2:3),life:1,c:cols[i%cols.length].trim(),s:(kind==='ok'?3:3+Math.random()*6)*devicePixelRatio}); }
+  if(!raf) loop(); }
+function loop(){ ctx.clearRect(0,0,fx.width,fx.height); parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=.25*devicePixelRatio; p.vx*=.97; p.life-=.018; ctx.globalAlpha=Math.max(p.life,0); ctx.fillStyle=p.c; ctx.fillRect(p.x,p.y,p.s,p.s); });
+  parts=parts.filter(p=>p.life>0); raf=parts.length?requestAnimationFrame(loop):(ctx.clearRect(0,0,fx.width,fx.height),null); }
+function boomAt(x,y){ sparks(x,y,'bad'); const b=$('stagebox'); b.classList.remove('shake','flash'); void b.offsetWidth; b.classList.add('shake','flash'); boomSound(); }
+let actx=null; function boomSound(){ try{ actx ||= new (window.AudioContext||window.webkitAudioContext)(); const len=actx.sampleRate*.5, buf=actx.createBuffer(1,len,actx.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3); const s=actx.createBufferSource(); s.buffer=buf; const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=700;
+  const g=actx.createGain(); g.gain.value=.5; s.connect(f).connect(g).connect(actx.destination); s.start(); }catch(e){} }
+let voiceOn=true, vz=null;
+function pickVoice(){ if(!window.speechSynthesis) return; const v=speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang)); vz=v.find(x=>/Alonso/i.test(x.name))||v.find(x=>/natural|online|google/i.test(x.name))||v[0]||null; }
+if(window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+function speak(t){ if(!voiceOn||!window.speechSynthesis) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.lang=vz?vz.lang:'es-ES'; if(vz) u.voice=vz; u.rate=1.02; speechSynthesis.speak(u); }
+$('voice').onclick=()=>{ voiceOn=!voiceOn; $('voice').textContent=voiceOn?'🔊 Voz: sí':'🔇 Voz: no'; if(!voiceOn&&window.speechSynthesis) speechSynthesis.cancel(); };
+$('hint').onclick=()=>{ const h=hintText(); say('warn','Pista',h); speak(h); };
+$('reset').onclick=()=>start(P);
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',String(x===t))); const v=t.dataset.p; start(v==='R'?'R':+v); });
+let gen=0; const later=(f,ms)=>{ const g=gen; setTimeout(()=>{ if(g===gen) f(); },ms); };
+function start(p){ gen++; P=p; st={}; errs=0; fails=0; picked.clear(); chipSel=null; slots=[]; form=null; fl.querySelectorAll('.f').forEach(x=>x.setAttribute('aria-pressed','false'));
+  $('nuevoR').hidden = p!=='R'; $('nivR').hidden = p!=='R';
+  document.querySelectorAll('.lvb').forEach(x=>x.setAttribute('aria-pressed',String(+x.dataset.lv===nivelA)));
+  if(p==='R'){ RA=genR(); PH.R = RA.dir==='e2m' ? [...(Object.keys(RA.pairs).length?['Simplifica']:[]),'Cuenta las mallas','Traduce arrastrando','Ecuaciones'] : ['Cuenta las mallas','Traduce arrastrando','Ecuaciones']; }
+  $('errs').textContent=0; $('eqs').hidden=true; goPhase(0); }
+
+/* ======================= MODO ALEATORIO ======================= */
+let RA=null;
+const M2E0={m1:'L1',m2:'L2',b1:'R1',k1:'C1',b12:'R2',k12:'C2',b2:'R3',k2:'C3'};
+let M2E=M2E0, E2M=Object.fromEntries(Object.entries(M2E).map(([a,b])=>[b,a]));
+const shuffle=a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const SB='₀₁₂₃₄₅₆₇₈₉', sbx=s=>String(s).replace(/\d/g,d=>SB[d]);
+const dn=n=>{ const m=n.match(/^([A-Za-z])(\d+)([ab]?)$/); return m? m[1]+sbx(m[2])+(m[3]==='a'?'′':m[3]==='b'?'″':'') : n; };
+let nivelA=2; try{ nivelA=+localStorage.getItem('analogias-nivel')||2; }catch(e){}
+/* 3 puntos en cadena (como el Ej. 3): pared – x1 – x2 – x3 – piso; un punto puede no tener masa (placa) */
+function genR3(){
+  const sub=()=>{ const r=[]; if(Math.random()<.6) r.push('b'); if(Math.random()<.6) r.push('k'); if(!r.length) r.push(Math.random()<.5?'b':'k'); return r; };
+  let hm; do{ hm=[0,Math.random()<.4,Math.random()<.4,Math.random()<.55]; }while(!hm.some(Boolean));
+  const A={n:3, hm, own1: !hm[1]||Math.random()<.75?sub():[], sh12:sub(), sh23:sub(), own3: !hm[3]||Math.random()<.75?sub():[],
+    f: Math.random()<.5?1:Math.random()<.5?2:3, dir:Math.random()<.5?'m2e':'e2m', st:{}};
+  const el={}; [1,2,3].forEach(i=>{ if(hm[i]) el['m'+i]={t:'m',a:i}; });
+  A.own1.forEach(t=>el[t+'1']={t,a:1,b:0}); A.sh12.forEach(t=>el[t+'12']={t,a:1,b:2}); A.sh23.forEach(t=>el[t+'23']={t,a:2,b:3}); A.own3.forEach(t=>el[t+'3']={t,a:3,b:0});
+  const map={}; let nr=0, nc=0; [1,2,3].forEach(i=>{ if(hm[i]) map['m'+i]='L'+i; });
+  [['1',A.own1],['12',A.sh12],['23',A.sh23],['3',A.own3]].forEach(([s,z])=>['b','k'].forEach(t=>{ if(z.includes(t)) map[t+s]= t==='b'?'R'+(++nr):'C'+(++nc); }));
+  M2E=map; E2M=Object.fromEntries(Object.entries(map).map(([a,b])=>[b,a]));
+  A.el=el; A.ele=Object.fromEntries(Object.entries(el).map(([k,v])=>[map[k],v]));
+  A.pairs={}; if(A.dir==='e2m'){ const c=Object.keys(A.ele).filter(k=>k[0]!=='L'); shuffle(c).slice(0,Math.random()<.5?1:2).forEach(k=>A.pairs[k]=Math.random()<.5?'serie':'paralelo'); }
+  return A; }
+function genR(){
+  const lv=nivelA; if(lv===4) return genR3();
+  M2E=M2E0; E2M=Object.fromEntries(Object.entries(M2E).map(([a,b])=>[b,a]));
+  const sub=()=>{ if(lv===3) return ['b','k']; if(lv===1) return [Math.random()<.5?'b':'k'];
+    const r=[]; if(Math.random()<.6) r.push('b'); if(Math.random()<.6) r.push('k'); if(!r.length) r.push(Math.random()<.5?'b':'k'); return r; };
+  const A={n:2, top:sub(), mid:sub(), bot:lv===3?sub():Math.random()<(lv===1?.4:.25)?[]:sub(), f:Math.random()<.6?1:2, dir:Math.random()<.5?'m2e':'e2m', st:{}};
+  const el={m1:{t:'m',a:1},m2:{t:'m',a:2}};
+  A.top.forEach(t=>el[t+'1']={t,a:1,b:0}); A.mid.forEach(t=>el[t+'12']={t,a:1,b:2}); A.bot.forEach(t=>el[t+'2']={t,a:2,b:0});
+  A.el=el; A.ele=Object.fromEntries(Object.entries(el).map(([k,v])=>[M2E[k],v]));
+  A.pairs={}; if(A.dir==='e2m'&&lv>1){ const c=Object.keys(A.ele).filter(k=>k[0]!=='L'); const n=lv===3?2:Math.random()<.35?2:1;
+    shuffle(c).slice(0,Math.min(n,c.length)).forEach(k=>A.pairs[k]=Math.random()<.5?'serie':'paralelo'); }
+  return A; }
+const zoneOf=e=> e.t==='m' ? 'm'+e.a : e.b===0 ? 'own'+e.a : (RA&&RA.n===3) ? 'sh'+e.a+e.b : 'sh';
+const pn=i=> RA&&RA.n===3 ? 'x'+sbx(i) : 'm'+sbx(i);
+const ZT2={own1:'solo de la malla 1 (de m₁ a la pared)',own2:'solo de la malla 2 (de m₂ a la pared)',sh:'de la rama compartida (entre m₁ y m₂)',m1:'la masa m₁',m2:'la masa m₂',fuente:'la fuerza / fuente'};
+const ZT3={own1:'solo de la malla 1 (de x₁ a la pared de arriba)',own3:'solo de la malla 3 (de x₃ al piso)',sh12:'de la rama compartida entre las mallas 1 y 2 (entre x₁ y x₂)',sh23:'de la rama compartida entre las mallas 2 y 3 (entre x₂ y x₃)',m1:'la masa del punto x₁',m2:'la masa del punto x₂',m3:'la masa del punto x₃',fuente:'la fuerza / fuente'};
+const ZT=new Proxy({},{get:(o,k)=>(RA&&RA.n===3?ZT3:ZT2)[k]});
+function labelR(name,x,y,anchor){ const m=name.match(/^([A-Z])(\d)([ab]?)$/); const sub=m?`<tspan baseline-shift="sub" font-size="70%">${m[2]}</tspan>${m[3]==='a'?'′':m[3]==='b'?'″':''}`:'';
+  return `<text x="${x}" y="${y}" font-size="15" text-anchor="${anchor}" font-weight="500">${m?m[1]+sub:name}</text>`; }
+function circR(A,st,o={}){
+  const X0=80,X1=470,X2=860,Y0=70,Y1=310; let s='';
+  const E=A.ele, own1=['R1','C1'].filter(k=>E[k]), sh=['R2','C2'].filter(k=>E[k]), own2=['R3','C3'].filter(k=>E[k]);
+  const sym=(t,x1,y1,x2,y2)=> t==='R'?RES(x1,y1,x2,y2):t==='C'?CAP(x1,y1,x2,y2):t==='L'?IND(x1,y1,x2,y2):W([[x1,y1],[x2,y2]])+SRC((x1+x2)/2,(y1+y2)/2);
+  const one=(id,x1,y1,x2,y2,side,nuevo)=>{ const vert=x1===x2, mx=(x1+x2)/2, my=(y1+y2)/2, box=vert?[mx-30,my-36,60,72]:[mx-38,my-28,76,56];
+    const t=id[0]; const lp = side==='l'?[mx-24,my+5,'end']:side==='r'?[mx+24,my+5,'start']:side==='u'?[mx,my-20,'middle']:[mx,my+32,'middle'];
+    const lab = t==='V' ? T(lp[0],lp[1],'V',{a:lp[2],w:700}) : labelR(id,lp[0],lp[1],lp[2]);
+    return EL(id, sym(t,x1,y1,x2,y2)+lab, box, nuevo); };
+  const seg=(items,x1,y1,x2,y2,side)=>{ if(!items.length){ s+=W([[x1,y1],[x2,y2]]); return; } const n=items.length;
+    items.forEach((it,i)=>{ const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n], b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n];
+      const kind=A.pairs[it]; const nv=st._n===it;
+      if(kind && !st[it]){ const vert=a[0]===b[0];
+        if(kind==='serie'){ const m=[(a[0]+b[0])/2,(a[1]+b[1])/2]; s+=one(it+'a',a[0],a[1],m[0],m[1],side)+one(it+'b',m[0],m[1],b[0],b[1],side); }
+        else if(vert){ const x=a[0], ya=a[1]+(b[1]-a[1])*.25, yb=a[1]+(b[1]-a[1])*.75, o2=24;
+          s+=W([[x,a[1]],[x,ya]])+W([[x-o2,ya],[x+o2,ya]])+W([[x-o2,yb],[x+o2,yb]])+W([[x,yb],[x,b[1]]])+one(it+'a',x-o2,ya,x-o2,yb,'l')+one(it+'b',x+o2,ya,x+o2,yb,'r'); }
+        else { const y=a[1], xa=a[0]+(b[0]-a[0])*.25, xb=a[0]+(b[0]-a[0])*.75, o2=24;
+          s+=W([[a[0],y],[xa,y]])+W([[xa,y-o2],[xa,y+o2]])+W([[xb,y-o2],[xb,y+o2]])+W([[xb,y],[b[0],y]])+one(it+'a',xa,y-o2,xb,y-o2,'u')+one(it+'b',xa,y+o2,xb,y+o2,'d'); } }
+      else s+=one(it,a[0],a[1],b[0],b[1],side,nv); }); };
+  if(A.n===3){ const X=[50,390,670,950], zk=z=>Object.keys(E).filter(k=>E[k].t!=='m'&&zoneOf(E[k])===z).sort();
+    seg(A.f===1?['V']:[],X[0],Y1,X[0],Y0,'l'); seg([...(E.L1?['L1']:[]),...zk('own1')],X[0],Y0,X[1],Y0,'u');
+    seg(zk('sh12'),X[1],Y0,X[1],Y1,'r'); seg(E.L2?['L2']:[],X[1],Y0,X[2],Y0,'u'); seg(zk('sh23'),X[2],Y0,X[2],Y1,'r');
+    seg(E.L3?['L3']:[],X[2],Y0,X[3],Y0,'u'); seg(zk('own3'),X[3],Y0,X[3],Y1,'r');
+    seg(A.f===2?['V']:[],X[2],Y1,X[1],Y1,'d'); seg(A.f===3?['V']:[],X[3],Y1,X[2],Y1,'d'); s+=W([[X[0],Y1],[X[1],Y1]]);
+    if(o.mesh) s+=MESH(220,195,'q1')+MESH(530,195,'q2')+MESH(810,195,'q3');
+    return s; }
+  seg(A.f===1?['V']:[],X0,Y1,X0,Y0,'l'); seg(['L1',...own1],X0,Y0,X1,Y0,'u'); s+=W([[X0,Y1],[X1,Y1]]);
+  seg(sh,X1,Y0,X1,Y1,'r'); seg(['L2'],X1,Y0,X2,Y0,'u'); seg(own2,X2,Y0,X2,Y1,'r'); seg(A.f===2?['V']:[],X2,Y1,X1,Y1,'d');
+  if(o.mesh) s+=MESH(275,195,'q1')+MESH(665,195,'q2');
+  return s; }
+/* reparto vertical de la cadena de 3 puntos entre y0 (pared) e y1 (piso): masa = bloque, sin masa = placa delgada */
+function lay3(A,y0,y1,MH=38,PLH=8){ const hs=[1,2,3].map(i=>A.hm[i]?MH:PLH), Z=(y1-y0-hs.reduce((a,b)=>a+b,0))/4; let y=y0+Z; const p={};
+  [1,2,3].forEach((i,k)=>{ p[i]={top:y,bot:y+hs[k],mid:y+hs[k]/2,mass:!!A.hm[i]}; y+=hs[k]+Z; });
+  return {p, z:{own1:[y0,p[1].top],sh12:[p[1].bot,p[2].top],sh23:[p[2].bot,p[3].top],own3:[p[3].bot,y1]}}; }
+function mecR3(A){ let s='<g class="mec">'+WALL(70,330,30,true)+WALL(70,330,405,false); const L=lay3(A,30,405);
+  const xs=n=>n===1?[200]:[150,250];
+  const put=(list,[y1,y2],suf)=>{ xs(list.length).forEach((x,i)=>{ const t=list[i]; s+=t==='b'?DAMP(x,y1,y2):SPRING(x,y1,y2);
+      const right=list.length>1&&i===1; s+=T(x+(right?24:-24),(y1+y2)/2+5,t+suf,{a:right?'start':'end',c:'var(--mec)',w:600}); }); };
+  put(A.own1,L.z.own1,'1'); put(A.sh12,L.z.sh12,'12'); put(A.sh23,L.z.sh23,'23'); put(A.own3,L.z.own3,'3');
+  [1,2,3].forEach(i=>{ const q=L.p[i];
+    if(q.mass) s+=`<rect class="sym" x="110" y="${q.top}" width="180" height="${q.bot-q.top}" fill="var(--block)"/>`+T(200,q.mid+6,'m'+i,{a:'middle',s:18,w:700});
+    else s+=`<rect class="sym" x="110" y="${q.top}" width="180" height="${q.bot-q.top}" fill="var(--mec)"/>`+T(296,q.mid+18,'sin masa',{c:'var(--muted)',s:11.5});
+    s+=T(300,q.mid+(q.mass?6:2),'x'+i,{c:'var(--accent)',w:600}); });
+  const fq=L.p[A.f]; s+=FARROW(88,fq.top-26,fq.top+30)+T(74,fq.top+8,'F',{a:'end',s:17,w:700});
+  return s+'</g>'; }
+function mecR(A,o={}){ if(A.n===3) return mecR3(A); let s='<g class="mec">'+WALL(70,330,30,true)+WALL(70,330,405,false);
+  const xs=n=>n===1?[200]:[150,250];
+  const put=(list,y1,y2,suf)=>{ xs(list.length).forEach((x,i)=>{ const t=list[i]; s+=t==='b'?DAMP(x,y1,y2):SPRING(x,y1,y2);
+      const right=list.length>1&&i===1; s+=T(x+(right?24:-24),(y1+y2)/2+5,t+suf,{a:right?'start':'end',c:'var(--mec)',w:600}); }); };
+  put(A.top,30,130,'1'); put(A.mid,172,255,'12'); if(A.bot.length) put(A.bot,297,405,'2');
+  s+=`<rect class="sym" x="110" y="130" width="180" height="42" fill="var(--block)"/><rect class="sym" x="110" y="255" width="180" height="42" fill="var(--block)"/>`;
+  s+=T(200,157,'m1',{a:'middle',s:18,w:700})+T(200,282,'m2',{a:'middle',s:18,w:700})+T(300,157,'x1',{c:'var(--accent)',w:600})+T(300,282,'x2',{c:'var(--accent)',w:600});
+  const fy=A.f===1?130:255; s+=FARROW(88,fy-26,fy+30)+T(74,fy+8,'F',{a:'end',s:17,w:700});
+  return s+'</g>'; }
+function drawSimpR(){ svg.setAttribute('viewBox','0 0 1000 380'); const ks=Object.keys(RA.pairs), n=ks.filter(k=>RA.st[k]).length;
+  svg.innerHTML=circR(RA,RA.st)+`<text x="990" y="24" text-anchor="end" font-size="15" font-weight="600" fill="${n===ks.length?'var(--ok)':'var(--accent)'}">Combinaciones: ${n} de ${ks.length}</text>`; bindEls(); }
+const needForm=(k,kind)=>k[0]==='R'?(kind==='serie'?'RS':'RP'):(kind==='serie'?'CS':'CP');
+function checkSimplifyR(){
+  const sel=[...picked]; if(!form){ shakeSide(); say('warn','Primero la fórmula','Toca a la izquierda la fórmula y luego encierra los dos elementos.'); return; }
+  const same=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+  const pend=Object.entries(RA.pairs).filter(([k])=>!RA.st[k]);
+  const mv=pend.find(([k,kind])=>needForm(k,kind)===form&&same([k+'a',k+'b'],sel));
+  if(mv){ const [k,kind]=mv, a=dn(k+'a'), b=dn(k+'b'), K=dn(k);
+    const why = k[0]==='R' ? (kind==='serie'?`${a} y ${b} llevan la misma corriente: serie. ${K} = ${a} + ${b}.`:`${a} y ${b} comparten los dos extremos: paralelo. ${K} = ${a}·${b} / (${a} + ${b}).`)
+                           : (kind==='serie'?`${a} y ${b} llevan la misma corriente: serie. En capacitores va con inversos: ${K} = ${a}·${b} / (${a} + ${b}).`:`${a} y ${b} comparten los dos extremos: paralelo. En capacitores se suman directo: ${K} = ${a} + ${b}.`);
+    success(sel,why,()=>{ RA.st[k]=true; RA.st._n=k; picked.clear(); drawSimpR(); RA.st._n=null; if(pend.length===1) later(()=>goPhase(phase+1),1000); }); return; }
+  const sup=pend.find(([k,kind])=>needForm(k,kind)===form&&sel.includes(k+'a')&&sel.includes(k+'b')&&sel.length>2);
+  if(sup){ const [k]=sup, ex=sel.filter(x=>x!==k+'a'&&x!==k+'b').map(dn); say('warn','Casi: te sobran elementos',`${dn(k+'a')} y ${dn(k+'b')} es lo correcto, pero también encerraste ${ex.join(', ')}. Pulsa «Comprobar».`); picked=new Set([k+'a',k+'b']); paintPick(); return; }
+  let why='Esa combinación no aplica aquí.';
+  const pairOf=pend.find(([k])=>same([k+'a',k+'b'],sel));
+  if(new Set(sel.map(x=>x[0])).size>1) why='No se combinan elementos de distinto tipo: resistencias con resistencias y capacitores con capacitores.';
+  else if(pairOf){ const [k,kind]=pairOf; why=`${dn(k+'a')} y ${dn(k+'b')} están en ${kind}. ${k[0]==='C'?'Y ojo: en capacitores la serie va con inversos y el paralelo se suma directo.':''}`; }
+  else if(sel.some(x=>!/[ab]$/.test(x))) why=`${sel.filter(x=>!/[ab]$/.test(x)).map(dn).join(', ')} ya está solo: no hay con qué combinarlo. Busca los pares marcados con ′ y ″.`;
+  fail(sel,why); }
+function goPhaseR(n){ phase=n; phases(); picked.clear(); fails=0; $('tray').hidden=true; opts(); $('check').hidden=true; RA.simp=false; slots=[];
+  const name=PH.R[n];
+  if(name==='Simplifica'){ RA.simp=true; $('check').hidden=false; drawSimpR(); const k=Object.keys(RA.pairs).length;
+    say('','Fase 1 · Simplifica',`Hay ${k} par${k>1?'es':''} para combinar (marcados con ′ y ″). Elige la fórmula y encierra o toca los dos elementos.`); return; }
+  if(name==='Cuenta las mallas' && RA.n===3){
+    const sinM=[1,2,3].filter(i=>!RA.hm[i]), sm=sinM.map(i=>'x'+sbx(i)).join(' y ');
+    if(RA.dir==='e2m'){ svg.setAttribute('viewBox','0 0 1000 380'); svg.innerHTML=circR(RA,Object.fromEntries(Object.keys(RA.pairs).map(k=>[k,1])),{mesh:1});
+      const noL=sinM.length?` La malla ${sinM.join(' y la ')} no tiene${sinM.length>1?'n':''} inductancia: ese punto se mueve pero no tiene masa (es una placa).`:'';
+      say('','¿Cuántos puntos que se mueven?','El circuito ya está simplificado. Cada malla es un punto que se mueve. ¿Cuántos puntos tendrá el sistema mecánico?');
+      opts([['2',()=>quiz(false,'Cuenta las mallas cerradas: q1, q2 y q3. Son tres.')],['3',()=>quiz(true,'Tres mallas → tres puntos, x₁, x₂ y x₃.'+noL)],['4',()=>quiz(false,'Solo hay tres mallas cerradas: tres puntos.')]]); }
+    else { svg.setAttribute('viewBox','0 0 1000 430'); svg.innerHTML=`<g transform="translate(310,6)">${mecR(RA)}</g>`;
+      say('','¿Cuántas mallas?','Cada punto que se mueve por su cuenta es una malla, tenga masa o no (una placa sin masa también cuenta). ¿Cuántas mallas tendrá el circuito?');
+      opts([['2',()=>quiz(false,`Faltan puntos: ${sinM.length?sm+' no tiene'+(sinM.length>1?'n':'')+' masa, pero se mueve'+(sinM.length>1?'n':'')+' por su cuenta. ':''}Son x₁, x₂ y x₃.`)],
+            ['3',()=>quiz(true,`Tres puntos se mueven por su cuenta: x₁, x₂ y x₃ → tres mallas, q1, q2 y q3.${sinM.length?' La malla de '+sm+' no lleva inductancia porque no hay masa.':''}`)],
+            ['4',()=>quiz(false,'La pared y el piso no se mueven: no cuentan. Son tres puntos.')]]); }
+    return; }
+  if(name==='Cuenta las mallas'){
+    if(RA.dir==='e2m'){ svg.setAttribute('viewBox','0 0 1000 380'); svg.innerHTML=circR(RA,Object.fromEntries(Object.keys(RA.pairs).map(k=>[k,1])),{mesh:1});
+      say('','¿Cuántas masas?','El circuito ya está simplificado. ¿Cuántas masas tendrá el sistema mecánico?');
+      opts([['1',()=>quiz(false,'Cuenta las mallas cerradas: cada una es una masa.')],['2',()=>quiz(true,'Dos mallas, q1 y q2 → dos masas: m1 = L1 y m2 = L2.')],['3',()=>quiz(false,'Solo hay dos mallas cerradas: dos masas.')]]); }
+    else { svg.setAttribute('viewBox','0 0 1000 430'); svg.innerHTML=`<g transform="translate(310,6)">${mecR(RA)}</g>`;
+      say('','¿Cuántas mallas?','Cada masa (cada punto que se mueve por su cuenta) es una malla. ¿Cuántas mallas tendrá el circuito?');
+      opts([['1',()=>quiz(false,'Hay dos masas que se mueven por su cuenta: dos mallas.')],['2',()=>quiz(true,'Dos masas, x1 y x2 → dos mallas, q1 y q2.')],['3',()=>quiz(false,'La pared y el piso no se mueven: no cuentan. Dos mallas.')]]); }
+    return; }
+  if(name==='Traduce arrastrando'&&RA.n===3){ drawTransR(); say('','Traduce arrastrando', RA.dir==='e2m'?'Arrastra cada elemento del circuito al sistema mecánico: L → masa, R → amortiguador, C → resorte, V → fuerza. Lo que está solo en la malla 1 va de x₁ a la pared; solo en la malla 3, de x₃ al piso; lo que está entre dos mallas va entre esos dos puntos.':'Arrastra cada elemento mecánico al circuito: masa → L, amortiguador → R, resorte → C, F → V. Lo que une x₁ con la pared va solo en la malla 1; x₃ con el piso, solo en la malla 3; lo que une dos puntos va en la rama que comparten esas dos mallas.'); return; }
+  if(name==='Traduce arrastrando'){ drawTransR(); say('','Traduce arrastrando', RA.dir==='e2m'?'Arrastra cada elemento del circuito a su lugar en el sistema mecánico: L → masa, R → amortiguador, C → resorte, V → fuerza. Lo que es solo de una malla va a la pared; lo compartido, entre las masas.':'Arrastra cada elemento mecánico a su lugar en el circuito: masa → L, amortiguador → R, resorte → C, F → V. Lo que une una masa con la pared va solo en su malla; lo que une las dos masas va en la rama compartida.'); return; }
+  eqBuilderR(); }
+function drawTransR(){
+  svg.innerHTML=''; slots=[]; svg.setAttribute('viewBox','0 0 1000 430');
+  const A=RA, groups={own1:[],sh:[],own2:[]};
+  if(A.n===3) return drawTransR3();
+  if(A.dir==='e2m'){
+    for(const k in A.ele){ const z=zoneOf(A.ele[k]); if(groups[z]) groups[z].push(k); }
+    let s=`<g transform="translate(6,40) scale(.52)">${circR(A,Object.fromEntries(Object.keys(A.pairs).map(k=>[k,1])),{mesh:1})}</g>`;
+    s+=T(260,30,'Circuito simplificado',{a:'middle',c:'var(--muted)',s:13})+T(780,18,'Sistema mecánico: arrastra cada elemento',{a:'middle',c:'var(--muted)',s:13});
+    s+=`<g class="mec">${WALL(640,930,40,true)}${WALL(640,930,412,false)}</g>`; svg.innerHTML=s;
+    const xs=n=>n===1?[790]:[755,825];
+    groups.own1.forEach((_,i)=>addSlot('st'+i,xs(groups.own1.length)[i]-28,48,56,70,'v',groups.own1,40,126));
+    addSlot('sM1',680,126,200,44,'mass',['L1']);
+    groups.sh.forEach((_,i)=>addSlot('sm'+i,xs(groups.sh.length)[i]-28,174,56,76,'v',groups.sh,170,254));
+    addSlot('sM2',680,254,200,44,'mass',['L2']);
+    groups.own2.forEach((_,i)=>addSlot('sb'+i,xs(groups.own2.length)[i]-28,302,56,102,'v',groups.own2,298,412));
+    addSlot('sF',600,A.f===1?110:238,48,76,'force',['V']);
+    slots.forEach(sl=>sl.zone= sl.acc[0]==='V'?'fuente':sl.acc[0]==='L1'?'m1':sl.acc[0]==='L2'?'m2':zoneOf(A.ele[sl.acc[0]]));
+    chips(['V','L1',...groups.own1,...groups.sh,'L2',...groups.own2],'e');
+  } else {
+    for(const k in A.el){ const z=zoneOf(A.el[k]); if(groups[z]) groups[z].push(k); }
+    const X0=60,X1=500,X2=940,Y0=50,Y1=290, SC=.6, TXo=335, TYo=50;
+    let wires='', pend=[];
+    const segS=(items,x1,y1,x2,y2,kind)=>{ if(!items.length){ wires+=W([[x1,y1],[x2,y2]]); return; } const n=items.length, vert=x1===x2;
+      let prev=[x1,y1];
+      items.forEach((it,i)=>{ const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n], b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+        const len=Math.hypot(b[0]-a[0],b[1]-a[1]); const w=vert?56:Math.min(130,len*.7), h=vert?Math.min(96,len*.7):46;
+        const r=[m[0]-w/2,m[1]-h/2,w,h]; wires+= vert?W([[prev[0],prev[1]],[m[0],r[1]]]):W([[prev[0],prev[1]],[r[0],m[1]]]); prev= vert?[m[0],r[1]+h]:[r[0]+w,m[1]];
+        pend.push({it,r,kind:it.kind||kind}); });
+      wires+=W([[prev[0],prev[1]],[x2,y2]]); };
+    const mk=(acc,kind)=>({acc,kind});
+    segS(A.f===1?[mk(['F'],'src')]:[],X0,Y0,X0,Y1,'v');
+    segS([mk(['m1'],'h'),...groups.own1.map(()=>mk(groups.own1,'h'))],X0,Y0,X1,Y0,'h'); wires+=W([[X0,Y1],[X1,Y1]]);
+    segS(groups.sh.map(()=>mk(groups.sh,'v')),X1,Y0,X1,Y1,'v');
+    segS([mk(['m2'],'h')],X1,Y0,X2,Y0,'h'); segS(groups.own2.map(()=>mk(groups.own2,'v')),X2,Y0,X2,Y1,'v');
+    segS(A.f===2?[mk(['F'],'src')]:[],X1,Y1,X2,Y1,'h');
+    svg.innerHTML=`<g transform="translate(10,10)">${mecR(A)}</g>`+T(680,24,'Circuito: arrastra cada elemento a su lugar',{a:'middle',c:'var(--muted)',s:13})+
+      `<g transform="translate(${TXo},${TYo}) scale(${SC})">${wires}${MESH(280,185,'q1')}${MESH(720,185,'q2')}</g>`;
+    pend.forEach((p,i)=>{ const [x,y,w,h]=p.r; addSlot('e'+i,TXo+x*SC,TYo+y*SC,w*SC,h*SC,p.it.kind==='src'?'src':p.kind,p.it.acc); });
+    slots.forEach(sl=>sl.zone= sl.acc[0]==='F'?'fuente':sl.acc[0]==='m1'?'m1':sl.acc[0]==='m2'?'m2':zoneOf(A.el[sl.acc[0]]));
+    chips(['F','m1',...groups.own1,...groups.sh,'m2',...groups.own2],'m');
+  } }
+function drawTransR3(){
+  const A=RA, Z=['own1','sh12','sh23','own3'], groups={own1:[],sh12:[],sh23:[],own3:[]};
+  if(A.dir==='e2m'){
+    for(const k in A.ele) if(A.ele[k].t!=='m') groups[zoneOf(A.ele[k])].push(k);
+    Z.forEach(z=>groups[z].sort());
+    let s=`<g transform="translate(4,60) scale(.57)">${circR(A,Object.fromEntries(Object.keys(A.pairs).map(k=>[k,1])),{mesh:1})}</g>`;
+    s+=T(260,50,'Circuito simplificado',{a:'middle',c:'var(--muted)',s:13})+T(780,18,'Sistema mecánico: arrastra cada elemento',{a:'middle',c:'var(--muted)',s:13});
+    const L=lay3(A,40,412,44,8);
+    s+=`<g class="mec">${WALL(640,930,40,true)}${WALL(640,930,412,false)}`;
+    [1,2,3].forEach(i=>{ const q=L.p[i]; if(!q.mass) s+=`<rect class="sym" x="680" y="${q.top}" width="200" height="8" fill="var(--mec)"/>`; }); s+='</g>';
+    [1,2,3].forEach(i=>{ const q=L.p[i]; s+=T(q.mass?888:888,q.mid+5,'x'+i+(q.mass?'':'  (sin masa)'),{c:'var(--accent)',s:13,w:600}); });
+    svg.innerHTML=s;
+    const xs=n=>n===1?[780]:[745,815];
+    Z.forEach(z=>{ const [ya,yb]=L.z[z], g=groups[z]; g.forEach((_,i)=>addSlot(z+i,xs(g.length)[i]-28,ya+7,56,yb-ya-14,'v',g,ya,yb)); });
+    [1,2,3].forEach(i=>{ const q=L.p[i]; if(q.mass) addSlot('sM'+i,680,q.top,200,44,'mass',['L'+i]); });
+    const fq=L.p[A.f]; addSlot('sF',600,fq.mid-38,48,76,'force',['V']);
+    slots.forEach(sl=>sl.zone= sl.acc[0]==='V'?'fuente':zoneOf(A.ele[sl.acc[0]]));
+    const ch=['V']; [['L1','own1'],[null,'sh12'],['L2','sh23'],['L3','own3']].forEach(([l,z])=>{ if(l&&A.ele[l]) ch.push(l); ch.push(...groups[z]); });
+    chips(ch,'e'); return; }
+  for(const k in A.el) if(A.el[k].t!=='m') groups[zoneOf(A.el[k])].push(k);
+  const X=[40,370,670,960],Y0=50,Y1=290, SC=.6, TXo=335, TYo=60;
+  let wires='', pend=[];
+  const segS=(items,x1,y1,x2,y2)=>{ if(!items.length){ wires+=W([[x1,y1],[x2,y2]]); return; } const n=items.length, vert=x1===x2; let prev=[x1,y1];
+    items.forEach((it,i)=>{ const a=[x1+(x2-x1)*i/n,y1+(y2-y1)*i/n], b=[x1+(x2-x1)*(i+1)/n,y1+(y2-y1)*(i+1)/n], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+      const len=Math.hypot(b[0]-a[0],b[1]-a[1]); const w=vert?56:Math.min(130,len*.72), h=vert?Math.min(96,len*.7):46;
+      const r=[m[0]-w/2,m[1]-h/2,w,h]; wires+= vert?W([[prev[0],prev[1]],[m[0],r[1]]]):W([[prev[0],prev[1]],[r[0],m[1]]]); prev= vert?[m[0],r[1]+h]:[r[0]+w,m[1]];
+      pend.push({it,r,kind:it.kind}); });
+    wires+=W([[prev[0],prev[1]],[x2,y2]]); };
+  const mk=(acc,kind)=>({acc,kind}), zs=(z,kind)=>groups[z].map(()=>mk(groups[z],kind)), ms=i=>A.el['m'+i]?[mk(['m'+i],'h')]:[];
+  segS(A.f===1?[mk(['F'],'src')]:[],X[0],Y0,X[0],Y1);
+  segS([...ms(1),...zs('own1','h')],X[0],Y0,X[1],Y0); segS(zs('sh12','v'),X[1],Y0,X[1],Y1);
+  segS(ms(2),X[1],Y0,X[2],Y0); segS(zs('sh23','v'),X[2],Y0,X[2],Y1);
+  segS(ms(3),X[2],Y0,X[3],Y0); segS(zs('own3','v'),X[3],Y0,X[3],Y1);
+  segS(A.f===3?[mk(['F'],'src')]:[],X[3],Y1,X[2],Y1); segS(A.f===2?[mk(['F'],'src')]:[],X[2],Y1,X[1],Y1); wires+=W([[X[1],Y1],[X[0],Y1]]);
+  svg.innerHTML=`<g transform="translate(10,10)">${mecR(A)}</g>`+T(680,24,'Circuito: arrastra cada elemento a su lugar',{a:'middle',c:'var(--muted)',s:13})+
+    `<g transform="translate(${TXo},${TYo}) scale(${SC})">${wires}${MESH(205,185,'q1')}${MESH(520,185,'q2')}${MESH(815,185,'q3')}</g>`+
+    T(680,TYo+Y1*SC+40,'Una malla sin inductancia = un punto sin masa.',{a:'middle',c:'var(--muted)',s:12.5});
+  pend.forEach((p,i)=>{ const [x,y,w,h]=p.r; addSlot('e'+i,TXo+x*SC,TYo+y*SC,w*SC,h*SC,p.kind,p.it.acc); });
+  slots.forEach(sl=>sl.zone= sl.acc[0]==='F'?'fuente':zoneOf(A.el[sl.acc[0]]));
+  const ch=['F']; [['m1','own1'],[null,'sh12'],['m2','sh23'],['m3','own3']].forEach(([m,z])=>{ if(m&&A.el[m]) ch.push(m); ch.push(...groups[z]); });
+  chips(ch,'m'); }
+function symbolR(id,s){ const {x,y,w,h}=s, cx=x+w/2, cy=y+h/2;
+  if(RA.dir==='e2m'){ const mk=E2M[id]; const lab= id==='V'?'F = V' : id[0]==='L'?`${mk} = ${id}` : id[0]==='R'?`${mk} = ${id}`:`${mk} = 1/${id}`;
+    if(s.kind==='mass') return `<g class="mec">${MASS(x,y,x+w,y+h,'')}</g>`+T(cx,cy+6,lab,{a:'middle',s:15,w:600});
+    if(s.kind==='force') return `<g class="mec">${FARROW(cx,y,y+h)}</g>`+T(x-6,cy+5,lab,{a:'end',s:13,w:600});
+    const isR=id[0]==='R'; return `<g class="mec">${isR?DAMP(cx,y-4,y+h+4):SPRING(cx,y-4,y+h+4)}</g>`+T(cx+(cx>790?30:-30),cy+4,lab,{a:cx>790?'start':'end',s:12.5,w:600}); }
+  const ek=M2E[id]; const lab= id==='F'?'V = F' : id[0]==='m'?`${ek} = ${id}` : id[0]==='b'?`${ek} = ${id}`:`${ek} = 1/${id}`;
+  let sym=''; const t=id[0];
+  if(s.kind==='src') sym=SRC(cx,cy).replace('r="20"','r="14"');
+  else if(s.kind==='h') sym= t==='b'?RES(x,cy,x+w,cy):t==='k'?CAP(x,cy,x+w,cy):IND(x,cy,x+w,cy);
+  else sym= t==='b'?RES(cx,y,cx,y+h):CAP(cx,y,cx,y+h);
+  const right=s.kind!=='h'&&cx>900, lx=s.kind==='h'?cx:cx+(right?-20:20);
+  return sym+T(s.kind==='h'?cx:(cx>900?cx-20:cx+20), s.kind==='h'?(y<200?y-6:y+h+16):cy+4, lab, {a:s.kind==='h'?'middle':(cx>900?'end':'start'),s:12,w:600,c:'var(--accent)'}); }
+function explainOkR3(id){ const A=RA, e2m=A.dir==='e2m', E=e2m?A.ele:A.el;
+  if(id==='V') return `El voltaje de la fuente está en la malla ${A.f}: es la fuerza F que empuja a x${sbx(A.f)}.`;
+  if(id==='F') return `La fuerza empuja a x${sbx(A.f)}: es la fuente de voltaje, en la malla ${A.f}.`;
+  const e=E[id];
+  if(e.t==='m') return e2m?`${dn(id)} es la inductancia de la malla ${e.a}: es la masa del punto x${sbx(e.a)}.`:`La masa ${dn(id)} es una inductancia, L${sbx(e.a)} = ${dn(id)}, en la malla ${e.a}.`;
+  const what= e2m?(id[0]==='R'?'un amortiguador':'un resorte (k = 1/C)'):(id[0]==='b'?'una resistencia':'un capacitor (C = 1/k)');
+  if(e.b===0) return e2m?`${dn(id)} está solo en la malla ${e.a}: es ${what} de x${sbx(e.a)} a ${e.a===1?'la pared':'el piso'}.`:`${dn(id)} une x${sbx(e.a)} con ${e.a===1?'la pared':'el piso'}: es ${what} solo de la malla ${e.a}.`;
+  return e2m?`${dn(id)} está entre las mallas ${e.a} y ${e.b}: es ${what} entre x${sbx(e.a)} y x${sbx(e.b)}.`:`${dn(id)} une x${sbx(e.a)} con x${sbx(e.b)}: es ${what} en la rama compartida de las mallas ${e.a} y ${e.b}.`; }
+function explainOkR(id){ const A=RA; if(A.n===3) return explainOkR3(id);
+  if(A.dir==='e2m'){ if(id==='V') return 'El voltaje de la fuente es la fuerza F que empuja a la masa de esa malla.'; if(id[0]==='L') return `${dn(id)} es la inductancia de la malla ${id[1]}: es la masa m${sbx(id[1])}.`;
+    const z=zoneOf(A.ele[id]), what=id[0]==='R'?'un amortiguador':'un resorte (k = 1/C)';
+    return z==='sh'?`${dn(id)} está en la rama compartida: es ${what} entre m₁ y m₂.`:`${dn(id)} está solo en la malla ${z==='own1'?1:2}: es ${what} de m${z==='own1'?'₁':'₂'} a la pared.`; }
+  if(id==='F') return 'La fuerza es la fuente de voltaje, en la malla de la masa que empuja.'; if(id[0]==='m') return `La masa ${dn(id)} es una inductancia, L${sbx(id[1])} = ${dn(id)}.`;
+  const z=zoneOf(A.el[id]), what=id[0]==='b'?'una resistencia':'un capacitor (C = 1/k)';
+  return z==='sh'?`${dn(id)} une m₁ con m₂: es ${what} en la rama compartida.`:`${dn(id)} une m${z==='own1'?'₁':'₂'} con la pared: es ${what} solo de la malla ${z==='own1'?1:2}.`; }
+function explainBadR(id,s){ const A=RA;
+  if(A.dir==='e2m'){ if(id[0]==='L'&&s.kind!=='mass') return `${dn(id)} es una inductancia: su análogo es una masa.`; if(id==='V'&&s.kind!=='force') return 'El voltaje es la fuerza F: va en la flecha.';
+    if(s.kind==='mass') return 'En ese hueco va una masa: viene de una inductancia (L).'; if(s.kind==='force') return 'Ahí va la fuerza, que viene del voltaje V.';
+    const z=id==='V'?'fuente':zoneOf(A.ele[id]); return `${dn(id)} es ${ZT[z]}, y ese hueco es ${ZT[s.zone]}.`; }
+  if(id[0]==='m'&&s.kind!=='h') return 'La masa es una inductancia: va arriba en su malla.'; if(id==='F'&&s.kind!=='src') return 'La fuerza es la fuente de voltaje.';
+  if(s.kind==='src') return 'Ahí va la fuente, que viene de la fuerza F.';
+  const z=id==='F'?'fuente':zoneOf(A.el[id]); return `${dn(id)} es ${ZT[z]}, y ese hueco es ${ZT[s.zone]}. Mira entre qué cosas está conectado.`; }
+/* armador de ecuaciones del modo aleatorio (mecánico o eléctrico) */
+const rfc=(c,dom)=>{ const b=dn(c); return dom==='ele'&&c[0]==='C'?`(1/${b})`:b; };
+function rfv(v,dom){ const X=dom==='ele'?'q':'x', d1=dom==='ele'?'q̇':'ẋ', d2=dom==='ele'?'q̈':'ẍ', t=v[0];
+  if(t==='a') return d2+sbx(v[1]); if(t==='v') return d1+sbx(v[1]); if(t==='x') return X+sbx(v[1]);
+  return v[1]==='v'?`(${d1}${sbx(v[2])} − ${d1}${sbx(v[3])})`:`(${X}${sbx(v[2])} − ${X}${sbx(v[3])})`; }
+function rexp(el,i){ const out=new Set(); for(const c in el){ const e=el[c]; if(e.t==='m'){ if(e.a===i) out.add(c+'|a'+i); continue; }
+  if(e.a!==i&&e.b!==i) continue; const o=e.a===i?e.b:e.a; out.add(c+'|'+(o===0?(e.t==='b'?'v':'x')+i:'d'+(e.t==='b'?'v':'x')+i+o)); } return out; }
+function rdiag(el,c,v,i,dom){ const e=el[c], C=rfc(c,dom), nm=dom==='ele'?`la malla ${sbx(i)}`:pn(i);
+  const ord=v[0]==='a'?2:(v[0]==='v'||v.startsWith('dv'))?1:0, need={m:2,b:1,k:0}[e.t];
+  const what= dom==='ele'?{m:'la inductancia va con q̈ (dos puntos)',b:'la resistencia va con la corriente q̇ (un punto)',k:'el capacitor va con la carga: (1/C)·q, sin punto'}[e.t]:{m:'la masa va con la aceleración ẍ',b:'el amortiguador va con la velocidad ẋ (un punto)',k:'el resorte va con el desplazamiento x (sin punto)'}[e.t];
+  const touch=e.t==='m'?e.a===i:(e.a===i||e.b===i);
+  if(!touch) return `${C} no pertenece a ${nm}: no va en esta ecuación.`; if(ord!==need) return `${C}: ${what}.`;
+  if(e.t==='m') return `${C} va con la variable de su propia ${dom==='ele'?'malla':'masa'}.`;
+  const o=e.a===i?e.b:e.a, diff=v[0]==='d';
+  if(o===0&&diff) return dom==='ele'?`${C} está solo en ${nm}: no lleva resta.`:`${C} va de ${nm} a la pared: no lleva resta.`;
+  if(o!==0&&!diff) return dom==='ele'?`${C} está en la rama compartida: multiplica la resta de las dos mallas.`:`${C} une ${pn(e.a)} y ${pn(e.b)}: multiplica la diferencia.`;
+  if(diff&&!((v[2]==String(i)&&v[3]==String(o))||(v[3]==String(i)&&v[2]==String(o)))) return `${C} une ${dom==='ele'?'las mallas '+sbx(e.a)+' y '+sbx(e.b):pn(e.a)+' y '+pn(e.b)}: la resta es entre esas dos.`;
+  if(diff&&v[2]!=String(i)) return `En la ecuación de ${nm} la resta empieza por la variable de esta ecuación.`;
+  if(!diff&&v[1]!=String(i)) return `Usa la variable de esta ecuación (${sbx(i)}).`; return 'Revisa ese término.'; }
+const eqStr=(el,i,dom,rhs)=>[...rexp(el,i)].map(x=>{ const [c,v]=x.split('|'); return rfc(c,dom)+rfv(v,dom); }).join(' + ')+' = '+rhs;
+function eqBuilderR(){ phase=PH.R.length-1; phases(); $('tray').hidden=true; $('check').hidden=true;
+  const A=RA, dom=A.dir==='e2m'?'mec':'ele', el=dom==='mec'?A.el:A.ele, R=dom==='mec'?['F','0']:['V','0'];
+  const N=A.n||2, PTS=N===3?[1,2,3]:[1,2], rhs={}; PTS.forEach(i=>rhs[i]=A.f===i?R[0]:'0');
+  const st2={line:0,terms:PTS.map(()=>[]),rhs:PTS.map(()=>null),done:PTS.map(()=>false),coef:null,fails:0};
+  const ordk=k=>{ const e=el[k]; return (e.t==='m'?e.a*10:e.b===0?e.a*10+1:e.a*10+5)+(e.t==='k'?.5:0); };
+  const coefs=Object.keys(el).sort((a,b)=>ordk(a)-ordk(b));
+  const vars=[]; PTS.forEach(i=>vars.push('a'+i,'v'+i,'x'+i)); (N===3?[[1,2],[2,3]]:[[1,2]]).forEach(([i,j])=>vars.push('dv'+i+j,'dx'+i+j,'dv'+j+i,'dx'+j+i));
+  const name=i=>dom==='ele'?`malla ${sbx(i)}`:N===3?`x${sbx(i)}${el['m'+i]?' (masa m'+sbx(i)+')':' (sin masa)'}`:`m${sbx(i)}`;
+  const sinM=N===3?PTS.filter(i=>!A.hm[i]):[];
+  const nota=sinM.length?`<p class="note" style="margin:8px 0 0;font-size:13.5px">${dom==='mec'?sinM.map(i=>'x'+sbx(i)).join(' y ')+(sinM.length>1?' no tienen':' no tiene')+' masa: su ecuación no lleva término m·ẍ.':'La malla '+sinM.join(' y la ')+(sinM.length>1?' no tienen':' no tiene')+' inductancia: su ecuación no lleva término L·q̈.'}</p>`:'';
+  const box=$('eqs'); box.hidden=false;
+  box.innerHTML=`<h3>Escribe las ecuaciones · ${dom==='mec'?'sistema mecánico':'circuito (mallas)'}</h3>
+   <div class="cols"><div><table class="eq tab2"><tr><td>Masa · inductor</td><td>m·ẍ · L·q̈</td></tr><tr><td>Amortiguador · R</td><td>b·ẋ · R·q̇</td></tr><tr><td>Resorte · C</td><td>k·x · (1/C)·q</td></tr>
+     <tr><td>A la pared · solo una malla</td><td>sin resta</td></tr><tr><td>Entre masas · rama compartida</td><td>la resta, empezando por la de la ecuación</td></tr><tr><td>Lado derecho</td><td>${R[0]} si la empuja; si no, 0</td></tr></table>${nota}</div><div id="eblines"></div></div>
+   <div class="builder" id="ebpad">
+     <div><span class="lbl">1 · Coeficiente</span><div class="row">${coefs.map(c=>`<button class="tk c" data-c="${c}">${rfc(c,dom)}</button>`).join('')}</div></div>
+     <div><span class="lbl">2 · Multiplica a</span><div class="row">${vars.map(v=>`<button class="tk v" data-v="${v}">${rfv(v,dom)}</button>`).join('')}</div></div>
+     <div><span class="lbl">3 · Lado derecho</span><div class="row">${R.map(r=>`<button class="tk r" data-r="${r}">= ${r}</button>`).join('')}
+       <button class="btn primary" id="ebchk">✓ Comprobar ecuación</button><button class="btn" id="ebdel">⌫ Quitar último</button><button class="btn" id="ebclr">Borrar línea</button><button class="btn" id="ebsol">Ver solución</button></div></div></div>`;
+  const draw=()=>{ $('eblines').innerHTML=PTS.map((i,k)=>{ const t=st2.terms[k]; const body=t.length?t.map(x=>{ const [c,v]=x.split('|'); return `<span class="term">${rfc(c,dom)}${rfv(v,dom)}</span>`; }).join(' <span class="plus">+</span> '):'<span class="ph2">toca un coeficiente y luego lo que multiplica…</span>';
+    return `<div class="eline ${k===st2.line?'act':''} ${st2.done[k]?'ok':''}" data-k="${k}"><span class="who">Ecuación de ${name(i)}</span><div class="expr">${body} <span class="plus">=</span> <b>${st2.rhs[k]??'?'}</b></div></div>`; }).join('');
+    $('eblines').querySelectorAll('.eline').forEach(e=>e.onclick=()=>{ const k=+e.dataset.k; if(!st2.done[k]){ st2.line=k; draw(); } }); };
+  box.querySelectorAll('.tk.c').forEach(b=>b.onclick=()=>{ st2.coef=b.dataset.c; box.querySelectorAll('.tk.c').forEach(x=>x.classList.toggle('on',x===b)); });
+  box.querySelectorAll('.tk.v').forEach(b=>b.onclick=()=>{ if(!st2.coef){ say('warn','Primero el coeficiente','Toca el coeficiente y luego lo que multiplica.'); return; } st2.terms[st2.line].push(st2.coef+'|'+b.dataset.v); st2.coef=null; box.querySelectorAll('.tk.c').forEach(x=>x.classList.remove('on')); draw(); });
+  box.querySelectorAll('.tk.r').forEach(b=>b.onclick=()=>{ st2.rhs[st2.line]=b.dataset.r; draw(); });
+  $('ebdel').onclick=()=>{ st2.terms[st2.line].pop(); draw(); }; $('ebclr').onclick=()=>{ st2.terms[st2.line]=[]; st2.rhs[st2.line]=null; draw(); };
+  $('ebsol').onclick=()=>{ PTS.forEach((i,k)=>{ st2.terms[k]=[...rexp(el,i)]; st2.rhs[k]=rhs[i]; }); draw(); say('warn','Solución','Estas son las ecuaciones. Estúdialas y pide un ejercicio nuevo.'); };
+  $('ebchk').onclick=()=>{ const k=st2.line, i=k+1, S=new Set(st2.terms[k]), E=rexp(el,i);
+    if(!S.size){ say('warn','Línea vacía','Agrega términos.'); return; }
+    const wrong=[...S].filter(x=>!E.has(x)), miss=[...E].filter(x=>!S.has(x)), rOk=st2.rhs[k]===rhs[i];
+    if(!wrong.length&&!miss.length&&rOk&&S.size===st2.terms[k].length){ st2.done[k]=true; sparks(500,200,'ok'); say('ok','¡Bien!',`Ecuación de ${name(i)} correcta.`);
+      const nx=st2.done.findIndex(d=>!d); if(nx<0){ draw(); later(finishR,700); return; } st2.line=nx; draw(); return; }
+    errs++; st2.fails++; $('errs').textContent=errs; boomAt(500,200); const le=$('eblines').querySelector(`.eline[data-k="${k}"]`); if(le){ le.classList.remove('shake2'); void le.offsetWidth; le.classList.add('shake2'); }
+    let why; if(S.size!==st2.terms[k].length) why='Tienes un término repetido.'; else if(wrong.length){ const [c,v]=wrong[0].split('|'); why=rdiag(el,c,v,i,dom); }
+    else if(miss.length) why=`Te falta${miss.length>1?'n':''} ${miss.length} término${miss.length>1?'s':''}.`+(st2.fails>=2?` Falta lo de ${miss.map(x=>rfc(x.split('|')[0],dom)).join(', ')}.`:'');
+    else why= rhs[i]==='0'?`En ${name(i)} no hay ${dom==='ele'?'fuente':'fuerza'}: el lado derecho es 0.`:`El lado derecho de ${name(i)} es ${rhs[i]}.`;
+    say('bad','¡Boom!',why); speak(why); };
+  draw(); say('','Escribe las ecuaciones', dom==='mec'?(N===3?'Una ecuación por punto (x₁, x₂, x₃), con o sin masa.':'Una ecuación por masa, con los nombres del sistema que armaste arriba.'):'Una ecuación por malla, con los nombres del circuito que armaste arriba.');
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+  function finishR(){ const A=RA; const mec=PTS.map(i=>eqStr(A.el,i,'mec',A.f===i?'F':'0')), ele=PTS.map(i=>eqStr(A.ele,i,'ele',A.f===i?'V':'0'));
+    const pad=$('ebpad'); if(pad) pad.remove();
+    box.insertAdjacentHTML('beforeend',`<h3>El análogo completo</h3><div class="cols"><div class="col m"><h4>Mecánico</h4>${mec.map(l=>`<div class="line">${l}</div>`).join('')}</div>
+      <div class="col e"><h4>Eléctrico (mallas)</h4>${ele.map(l=>`<div class="line">${l}</div>`).join('')}</div></div>
+      <div><button class="btn primary big" id="otraR">⟳ Nuevo ejercicio</button></div>`);
+    $('otraR').onclick=()=>{ start('R'); window.scrollTo({top:0,behavior:'smooth'}); };
+    sparks(500,200,'ok'); say('ok','¡Ejercicio completo!',`Terminaste con ${errs} error${errs===1?'':'es'}. Abajo están las ecuaciones en los dos lenguajes. Pulsa «Nuevo ejercicio» para otro.`); speak('Ejercicio completo.'); }
+}
+$('nuevoR').onclick=()=>start('R');
+document.querySelectorAll('.lvb').forEach(b=>b.onclick=()=>{ nivelA=+b.dataset.lv; try{ localStorage.setItem('analogias-nivel',nivelA); }catch(e){} start('R'); });
+const h0=location.hash==='#aleatorio'?'R':4;
+document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.p===String(h0))));
+start(h0);
+</script>
+
+
+
+<footer style="max-width:1320px;margin:28px auto 0;padding:14px 0;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:space-between">
+  <span>Hecho por <b style="color:var(--ink)">Jheison Estiben Bernal Cucaita</b> · Ingeniería de Producción Industrial, Universidad Distrital Francisco José de Caldas</span>
+  <a href="../" style="color:var(--accent)">← Todos los ejercicios</a>
+</footer>
+</body>
+</html>

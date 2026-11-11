@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://jheisonbernal9922-code.github.io/sitemap.xml
