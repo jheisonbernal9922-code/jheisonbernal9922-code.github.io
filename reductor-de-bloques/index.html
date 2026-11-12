@@ -109,7 +109,9 @@ svg text{font-family:var(--mono);fill:var(--ink)}
 .recap .tf{font:500 15px/1.5 var(--mono);margin-top:12px;padding:12px;border:1px solid var(--line);overflow-x:auto}
 button:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
 /* panel de cálculo */
-.calc{border-top:1px solid var(--line);padding:14px 16px;display:grid;gap:10px;background:color-mix(in srgb,var(--sel) 9%,transparent)}
+.calc{border-top:4px solid var(--sel);padding:14px 16px;display:grid;gap:10px;background:color-mix(in srgb,var(--sel) 12%,transparent)}
+.calc.flash2{animation:flash2 .9s}
+@keyframes flash2{0%,100%{box-shadow:none}30%{box-shadow:inset 0 0 0 4px var(--sel)}}
 .calc .ct{font:700 15px/1.2 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--hl)}
 .calc .cq{margin:0;font:500 15px/1.65 var(--mono)}
 .calc .cq b{color:var(--ok);font-weight:600} .calc .cq i{color:var(--hl);font-style:normal;font-weight:600}
@@ -153,9 +155,9 @@ button:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
         <span class="chosen" id="chosen">Regla: ninguna</span>
       </div>
       <div class="stage" id="stagebox"><svg id="svg" viewBox="0 14 1000 370" aria-label="Diagrama de bloques"></svg><canvas id="fx"></canvas></div>
-      <div class="msg" id="msg"><span class="t">Empieza</span><p id="why">1) Toca una regla de la izquierda. 2) Encierra con el mouse (o el dedo) los bloques o sumadores donde la aplicas. 3) Suelta.</p></div>
       <div class="calc" id="calc" hidden>
         <span class="ct" id="calcT">Ahora el cálculo</span>
+        <p class="cq" style="font:600 14px/1.4 var(--body);color:var(--ink)">Antes de seguir con el diagrama, escribe aquí qué queda. Si no quieres hacer el cálculo, pulsa «Ver respuesta y seguir» o apaga «∑ Cálculo» abajo.</p>
         <p class="cq" id="calcQ"></p>
         <div class="cin">
           <label>Arriba (numerador)<input id="cNum" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="G1G2"></label>
@@ -166,6 +168,7 @@ button:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
         <div class="cbtn"><button class="btn primary" id="cOk">✓ Verificar cálculo</button><button class="btn" id="cHow">📖 ¿Cómo se hace?</button><button class="btn" id="cSkip">Ver respuesta y seguir</button><button class="btn primary" id="cNext" hidden>Siguiente →</button></div>
         <pre class="chow" id="calcHow" hidden></pre>
       </div>
+      <div class="msg" id="msg"><span class="t">Empieza</span><p id="why">1) Toca una regla de la izquierda. 2) Encierra con el mouse (o el dedo) los bloques o sumadores donde la aplicas. 3) Suelta.</p></div>
       <div class="tools">
         <button class="btn primary" id="check">✓ Comprobar</button>
         <button class="btn" id="hint">💡 Pista</button>
@@ -523,7 +526,7 @@ let pts=[], drawing=false, moved=false, downEl=null;
 function toSvg(ev){ const p=svg.createSVGPoint(); p.x=ev.clientX; p.y=ev.clientY; const q=p.matrixTransform(svg.getScreenCTM().inverse()); return [q.x,q.y]; }
 let pid=null;
 function clearLasso(){ svg.querySelectorAll('polygon.lasso').forEach(p=>p.remove()); lassoEl=null; }
-svg.addEventListener('pointerdown',ev=>{ if(curStage().final || ev.button>0 || calcOpen) return;
+svg.addEventListener('pointerdown',ev=>{ if(calcOpen){ nudgeCalc(); return; } if(curStage().final || ev.button>0) return;
   ev.preventDefault(); clearLasso(); drawing=true; moved=false; pts=[toSvg(ev)]; pid=ev.pointerId;
   const hit=ev.target.closest && ev.target.closest('.el'); downEl = hit ? hit.dataset.id : null;
   lassoEl=mk('polygon',{class:'lasso',points:''},svg); try{ svg.setPointerCapture(ev.pointerId); }catch(e){}
@@ -933,7 +936,7 @@ function renderQ(title){ const q=CQ.qs[CQ.i]; const c=$('calc'); c.hidden=false;
   $('calcQ').innerHTML=q.text; $('calcFb').textContent=''; $('calcFb').className='cfb';
   ['cNum','cDen'].forEach(id=>{ $(id).value=''; $(id).disabled=false; }); $('cOk').disabled=false; $('cSkip').disabled=false; CQ.tries=0;
   $('cPrev').textContent='Escribe con letras y números: G1G2 + G3, paréntesis (1+G1)G2, potencias G1^2. Enter para verificar.';
-  setTimeout(()=>$('cNum').focus(),50); c.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  setTimeout(()=>$('cNum').focus(),50); c.scrollIntoView({block:'center',behavior:'smooth'}); }
 function userR(){ const n=$('cNum').value.trim(), d=$('cDen').value.trim(); if(!n) throw 'escribe el de arriba';
   const N=parseR(n); if(!d||d==='1') return N; return rMul(N,rInv(parseR(d))); }
 function preview(){ try{ const r=userR(); $('cPrev').textContent='Así lo leo: '+SS(r); }catch(e){ $('cPrev').textContent=typeof e==='string'?'…'+e:'…'; } }
@@ -964,11 +967,13 @@ $('cSkip').onclick=()=>{ if(!CQ) return; const q=CQ.qs[CQ.i]; cTry++; $('ctry').
 $('cNext').onclick=()=>{ hideCalc(); startC(); };
 /* enganches: después de acertar la regla, pedir el cálculo */
 function success(mv){ if(!calcOn){ successGo(mv); return; } const qs=qFromFixed(mv,rule); if(!qs.length){ successGo(mv); return; }
-  say('ok',`Regla ${rule}: bien elegida`,'Ahora escribe qué queda. Mira abajo.'); speak('Bien. Ahora el cálculo.'); showCalc(qs,()=>successGo(mv)); }
+  say('ok',`Regla ${rule}: bien elegida`,'Ahora escribe en el recuadro amarillo qué queda.'); speak('Bien. Ahora el cálculo.'); showCalc(qs,()=>successGo(mv)); }
 function successR(mv){ if(!calcOn){ successRGo(mv); return; } const qs=qFromR(RM.model,mv,rule); if(!qs.length){ successRGo(mv); return; }
-  say('ok',`Regla ${rule}: bien elegida`,'Ahora escribe qué queda. Mira abajo.'); speak('Bien. Ahora el cálculo.'); showCalc(qs,()=>successRGo(mv)); }
-rlist.addEventListener('click',ev=>{ if(calcOpen){ ev.stopPropagation(); ev.preventDefault(); say('warn','Primero el cálculo','Termina de escribir qué queda (o pulsa «Ver respuesta y seguir»).'); } },true);
-const _check=$('check').onclick; $('check').onclick=()=>{ if(calcOpen){ say('warn','Primero el cálculo','Escribe qué queda y pulsa «Verificar cálculo».'); return; } _check(); };
+  say('ok',`Regla ${rule}: bien elegida`,'Ahora escribe en el recuadro amarillo qué queda.'); speak('Bien. Ahora el cálculo.'); showCalc(qs,()=>successRGo(mv)); }
+function nudgeCalc(){ const c=$('calc'); c.scrollIntoView({block:'center',behavior:'smooth'}); c.classList.remove('flash2'); void c.offsetWidth; c.classList.add('flash2'); if(!$('cNum').disabled) setTimeout(()=>$('cNum').focus(),300);
+  say('warn','Falta el cálculo','Escribe en el recuadro amarillo qué queda (arriba y abajo) y pulsa «Verificar cálculo». Si no quieres hacerlo, pulsa «Ver respuesta y seguir» o apaga «∑ Cálculo».'); }
+rlist.addEventListener('click',ev=>{ if(calcOpen){ ev.stopPropagation(); ev.preventDefault(); nudgeCalc(); } },true);
+const _check=$('check').onclick; $('check').onclick=()=>{ if(calcOpen){ if(!$('cOk').disabled) verifyCalc(); else nudgeCalc(); return; } _check(); };
 const _hint=$('hint').onclick; $('hint').onclick=()=>{ if(calcOpen){ $('cHow').click(); return; } _hint(); };
 const _undo=$('undo').onclick; $('undo').onclick=()=>{ if(drill){ return; } if(calcOpen){ hideCalc(); picked.clear(); paint(); say('','Cálculo cancelado','Vuelve a aplicar la regla cuando quieras.'); return; } _undo(); };
 $('reset').onclick=()=>{ hideCalc(); if(drill) startC(); else start(cur.p); };
